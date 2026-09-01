@@ -13,9 +13,6 @@ Levels:
 """
 
 
-# ---------------------------------------------------------
-# LEVEL DEFINITIONS
-# ---------------------------------------------------------
 
 LEVELS = [
     "Beginner",
@@ -25,9 +22,6 @@ LEVELS = [
 ]
 
 
-# ---------------------------------------------------------
-# DETERMINE USER LEVEL
-# ---------------------------------------------------------
 
 def determine_level(score, questions_answered):
     """
@@ -66,9 +60,6 @@ def determine_level(score, questions_answered):
         return "Beginner"
 
 
-# ---------------------------------------------------------
-# LEVEL DESCRIPTIONS
-# ---------------------------------------------------------
 
 LEVEL_DESCRIPTIONS = {
     "Beginner":
@@ -85,9 +76,6 @@ LEVEL_DESCRIPTIONS = {
 }
 
 
-# ---------------------------------------------------------
-# TEST USER LEVEL
-# ---------------------------------------------------------
 
 def test_user_level(score, questions_answered):
     """
@@ -124,10 +112,6 @@ def test_user_level(score, questions_answered):
 
     return level
 
-
-# ---------------------------------------------------------
-# EXAMPLE TESTS
-# ---------------------------------------------------------
 
 if __name__ == "__main__":
 
