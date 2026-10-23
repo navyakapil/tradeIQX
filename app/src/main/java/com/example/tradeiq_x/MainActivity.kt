@@ -24,6 +24,8 @@ private val Background = Color(0xFFF5F7FB)
 private val Grey = Color(0xFF64748B)
 private val Red = Color(0xFFDC2626)
 
+
+
 enum class AppScreen {
     WELCOME,
     LOGIN,
@@ -31,19 +33,39 @@ enum class AppScreen {
     HOME,
     STOCK_DETAILS,
     BUY,
-    SELL
+    SELL,
+    PORTFOLIO,
+    TRANSACTIONS
 }
 
+
+
+
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        android.util.Log.d("TradeIQX", "MainActivity onCreate")
+
         setContent {
             MaterialTheme {
                 TradeIQXApp()
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        android.util.Log.d("TradeIQX", "MainActivity onResume")
+    }
+
+    override fun onPause() {
+        android.util.Log.d("TradeIQX", "MainActivity onPause")
+        super.onPause()
+    }
 }
+
 
 @Composable
 fun TradeIQXApp() {
@@ -70,7 +92,9 @@ fun TradeIQXApp() {
 
             AppScreen.HOME -> HomeScreen(
                 onLogout = { screen = AppScreen.WELCOME },
-                onMarketWatch = { screen = AppScreen.STOCK_DETAILS }
+                onMarketWatch = { screen = AppScreen.STOCK_DETAILS },
+                onPortfolio = { screen = AppScreen.PORTFOLIO },
+                onTransactions = { screen = AppScreen.TRANSACTIONS }
             )
 
             AppScreen.STOCK_DETAILS -> StockDetailsScreen(
@@ -86,6 +110,14 @@ fun TradeIQXApp() {
 
             AppScreen.SELL -> SellScreen(
                 onBack = { screen = AppScreen.STOCK_DETAILS }
+            )
+
+            AppScreen.PORTFOLIO -> PortfolioScreen(
+                onBackClick = { screen = AppScreen.HOME }
+            )
+
+            AppScreen.TRANSACTIONS -> TransactionsScreen(
+                onBackClick = { screen = AppScreen.HOME }
             )
 
         }
@@ -360,7 +392,9 @@ fun SignUpScreen(
 @Composable
 fun HomeScreen(
     onLogout: () -> Unit,
-    onMarketWatch: () -> Unit
+    onMarketWatch: () -> Unit,
+    onPortfolio: () -> Unit,
+    onTransactions: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -456,8 +490,8 @@ fun HomeScreen(
             "Explore available shares",
             onClick = onMarketWatch
         )
-        QuickAccessCard("💼", "My Portfolio", "View your holdings")
-        QuickAccessCard("↔", "Transactions", "Review your paper trades")
+        QuickAccessCard("💼", "My Portfolio", "View your holdings",onClick = onPortfolio)
+        QuickAccessCard("↔", "Transactions", "Review your paper trades",onClick = onTransactions)
 
         Spacer(Modifier.height(20.dp))
 

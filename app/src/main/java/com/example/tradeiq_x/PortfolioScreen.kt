@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 
 private val PortfolioNavy = Color(0xFF0F172A)
 private val PortfolioGreen = Color(0xFF16A34A)
@@ -40,6 +41,7 @@ private val sampleHoldings = listOf(
 
 @Composable
 fun PortfolioScreen(
+    onBackClick: () -> Unit = {},
     onTransactionsClick: () -> Unit = {}
 ) {
     val invested = sampleHoldings.sumOf {
@@ -51,39 +53,43 @@ fun PortfolioScreen(
     }
 
     val profit = current - invested
-    val profitColor =
-        if (profit >= 0) PortfolioGreen else PortfolioRed
+    val profitColor = if (profit >= 0) PortfolioGreen else PortfolioRed
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(PortfolioBg)
     ) {
-
+        // Portfolio header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(PortfolioNavy)
-                .padding(20.dp),
-            contentAlignment = Alignment.Center
+                .padding(20.dp)
         ) {
-            Text(
-                "My Portfolio",
-                fontSize = 23.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+            Column {
+                TextButton(onClick = onBackClick) {
+                    Text("← Back", color = Color.White)
+                }
+
+                Text(
+                    text = "My Portfolio",
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
         }
 
-        // VERTICALLY SCROLLABLE CONTENT
+        // Vertically scrollable portfolio content
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            userScrollEnabled = true,
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Portfolio summary
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -91,25 +97,27 @@ fun PortfolioScreen(
                         containerColor = Color(0xFFF0FDF4)
                     )
                 ) {
-                    Column(Modifier.padding(20.dp)) {
+                    Column(
+                        modifier = Modifier.padding(20.dp)
+                    ) {
                         Text(
-                            "Total Portfolio Value",
+                            text = "Total Portfolio Value",
                             color = Color.Gray
                         )
 
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            "₹${String.format("%,.2f", current)}",
+                            text = "₹${String.format(Locale.US, "%,.2f", current)}",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = PortfolioNavy
                         )
 
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            "P&L: ₹${String.format("%,.2f", profit)}",
+                            text = "P&L: ₹${String.format(Locale.US, "%,.2f", profit)}",
                             color = profitColor,
                             fontWeight = FontWeight.Bold
                         )
@@ -117,27 +125,29 @@ fun PortfolioScreen(
                 }
             }
 
+            // Invested amount
             item {
                 Text(
-                    "Invested Value: ₹${String.format("%,.2f", invested)}",
+                    text = "Invested Value: ₹${String.format(Locale.US, "%,.2f", invested)}",
                     fontWeight = FontWeight.Medium,
                     color = PortfolioNavy
                 )
             }
 
+            // Holdings heading
             item {
                 Text(
-                    "My Holdings (${sampleHoldings.size})",
+                    text = "My Holdings (${sampleHoldings.size})",
                     fontSize = 21.sp,
                     fontWeight = FontWeight.Bold,
                     color = PortfolioNavy
                 )
             }
 
+            // Individual stock holdings
             items(sampleHoldings) { stock ->
                 val stockProfit =
-                    stock.quantity *
-                            (stock.currentPrice - stock.averagePrice)
+                    stock.quantity * (stock.currentPrice - stock.averagePrice)
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -146,26 +156,31 @@ fun PortfolioScreen(
                         containerColor = Color.White
                     )
                 ) {
-                    Column(Modifier.padding(16.dp)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
                         Text(
-                            stock.symbol,
+                            text = stock.symbol,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = PortfolioNavy
                         )
 
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         Text("Quantity: ${stock.quantity}")
                         Text("Average Price: ₹${stock.averagePrice}")
                         Text("Current Price: ₹${stock.currentPrice}")
 
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            "P&L: ₹${String.format("%,.2f", stockProfit)}",
-                            color = if (stockProfit >= 0)
-                                PortfolioGreen else PortfolioRed,
+                            text = "P&L: ₹${String.format(Locale.US, "%,.2f", stockProfit)}",
+                            color = if (stockProfit >= 0) {
+                                PortfolioGreen
+                            } else {
+                                PortfolioRed
+                            },
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -173,12 +188,12 @@ fun PortfolioScreen(
             }
         }
 
-        // FIXED BUTTON
+        // Fixed transaction-history button
         Button(
             onClick = onTransactionsClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .height(52.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = PortfolioGreen
