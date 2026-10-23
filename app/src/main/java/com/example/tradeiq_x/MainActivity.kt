@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
 private val Green = Color(0xFF16A34A)
 private val DarkGreen = Color(0xFF15803D)
 private val Dark = Color(0xFF0F172A)
@@ -24,7 +25,13 @@ private val Grey = Color(0xFF64748B)
 private val Red = Color(0xFFDC2626)
 
 enum class AppScreen {
-    WELCOME, LOGIN, SIGNUP, HOME
+    WELCOME,
+    LOGIN,
+    SIGNUP,
+    HOME,
+    STOCK_DETAILS,
+    BUY,
+    SELL
 }
 
 class MainActivity : ComponentActivity() {
@@ -62,8 +69,25 @@ fun TradeIQXApp() {
             )
 
             AppScreen.HOME -> HomeScreen(
-                onLogout = { screen = AppScreen.WELCOME }
+                onLogout = { screen = AppScreen.WELCOME },
+                onMarketWatch = { screen = AppScreen.STOCK_DETAILS }
             )
+
+            AppScreen.STOCK_DETAILS -> StockDetailsScreen(
+                onBuy = { screen = AppScreen.BUY },
+                onSell = { screen = AppScreen.SELL },
+                onBack = { screen = AppScreen.HOME }
+            )
+
+            AppScreen.BUY -> BuyScreen(
+                onBack = { screen = AppScreen.STOCK_DETAILS },
+                onSell = { screen = AppScreen.SELL }
+            )
+
+            AppScreen.SELL -> SellScreen(
+                onBack = { screen = AppScreen.STOCK_DETAILS }
+            )
+
         }
     }
 }
@@ -334,7 +358,10 @@ fun SignUpScreen(
 }
 
 @Composable
-fun HomeScreen(onLogout: () -> Unit) {
+fun HomeScreen(
+    onLogout: () -> Unit,
+    onMarketWatch: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -423,7 +450,12 @@ fun HomeScreen(onLogout: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        QuickAccessCard("📈", "Market Watch", "Explore available shares")
+        QuickAccessCard(
+            "📈",
+            "Market Watch",
+            "Explore available shares",
+            onClick = onMarketWatch
+        )
         QuickAccessCard("💼", "My Portfolio", "View your holdings")
         QuickAccessCard("↔", "Transactions", "Review your paper trades")
 
@@ -488,12 +520,14 @@ fun SummaryCard(
 fun QuickAccessCard(
     icon: String,
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 5.dp),
+            .padding(vertical = 5.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
