@@ -36,7 +36,8 @@ enum class AppScreen {
     BUY,
     SELL,
     PORTFOLIO,
-    TRANSACTIONS
+    TRANSACTIONS,
+    CHATBOT
 }
 
 
@@ -98,7 +99,8 @@ fun TradeIQXApp() {
                 onLogout = { screen = AppScreen.WELCOME },
                 onMarketWatch = { screen = AppScreen.MARKET_WATCH },
                 onPortfolio = { screen = AppScreen.PORTFOLIO },
-                onTransactions = { screen = AppScreen.TRANSACTIONS }
+                onTransactions = { screen = AppScreen.TRANSACTIONS },
+                onChatbot = { screen = AppScreen.CHATBOT }
             )
             AppScreen.MARKET_WATCH -> MarketWatchScreen(
                 onStockSelected = { symbol ->
@@ -143,6 +145,11 @@ fun TradeIQXApp() {
             AppScreen.TRANSACTIONS -> TransactionsScreen(
                 onBackClick = {
                     screen = AppScreen.PORTFOLIO
+                }
+            )
+            AppScreen.CHATBOT -> ChatbotScreen(
+                onBack = {
+                    screen = AppScreen.HOME
                 }
             )
 
@@ -421,8 +428,9 @@ fun HomeScreen(
     onLogout: () -> Unit,
     onMarketWatch: () -> Unit,
     onPortfolio: () -> Unit,
-    onTransactions: () -> Unit
-) {
+    onTransactions: () -> Unit,
+    onChatbot: () -> Unit
+){
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -522,6 +530,12 @@ fun HomeScreen(
         QuickAccessCard("💼", "My Portfolio", "View your holdings",onClick = onPortfolio)
         QuickAccessCard("↔", "Transactions", "Review your paper trades",onClick = onTransactions)
 
+        QuickAccessCard(
+            "🤖",
+            "AI Chatbot",
+            "Ask questions about stocks and investing",
+            onClick = onChatbot
+        )
         Spacer(Modifier.height(20.dp))
 
         Text(
