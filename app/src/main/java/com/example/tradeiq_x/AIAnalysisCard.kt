@@ -1,4 +1,5 @@
 
+
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.layout.*
@@ -11,49 +12,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-data class StockAnalysis(
-    val signal: String,
-    val risk: String,
-    val explanation: String
-)
-
-fun analyzeStock(symbol: String): StockAnalysis {
-    return when (symbol.uppercase()) {
-        "RELIANCE" -> StockAnalysis(
-            signal = "HOLD",
-            risk = "Medium",
-            explanation = "Sample neutral outlook for this stock."
-        )
-
-        "TCS" -> StockAnalysis(
-            signal = "BUY",
-            risk = "Low",
-            explanation = "Sample positive outlook for this stock."
-        )
-
-        "INFY" -> StockAnalysis(
-            signal = "SELL",
-            risk = "High",
-            explanation = "Sample negative outlook for this stock."
-        )
-
-        "HDFCBANK" -> StockAnalysis(
-            signal = "HOLD",
-            risk = "Medium",
-            explanation = "Sample mixed outlook for this stock."
-        )
-
-        else -> StockAnalysis(
-            signal = "HOLD",
-            risk = "Unknown",
-            explanation = "No sample analysis is available."
-        )
-    }
-}
-
 @Composable
 fun AIAnalysisCard(symbol: String) {
-    val analysis = analyzeStock(symbol)
+
+    // Get calculated results from StockAnalysisEngine.kt
+    val analysis = StockAnalysisEngine.analyze(symbol)
 
     val signalColor = when (analysis.signal) {
         "BUY" -> Color(0xFF32D49A)
@@ -102,7 +65,8 @@ fun AIAnalysisCard(symbol: String) {
             )
 
             Text(
-                text = "Fixed sample data, not a real AI prediction or investment advice.",
+                text = "Calculated from sample historical prices. " +
+                        "Not a real AI prediction or investment advice.",
                 color = Color(0xFF9FB0C0),
                 fontSize = 12.sp
             )
