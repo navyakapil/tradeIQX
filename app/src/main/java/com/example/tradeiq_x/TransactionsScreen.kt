@@ -16,257 +16,169 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
 import java.text.NumberFormat
+import java.util.Date
 import java.util.Locale
 
-private val TransactionNavy = Color(0xFF0F172A)
-private val TransactionGreen = Color(0xFF16A34A)
-private val TransactionRed = Color(0xFFEF4444)
-private val TransactionBg = Color(0xFFF8FAFC)
-private val TransactionGray = Color(0xFF64748B)
+private val TxBg = Color(0xFF071522)
+private val TxCard = Color(0xFF132838)
+private val TxGreen = Color(0xFF32D49A)
+private val TxRed = Color(0xFFFF5364)
+private val TxText = Color(0xFFF8FAFC)
+private val TxMuted = Color(0xFF9FB0C0)
 
-private data class DemoTransaction(
-    val id: Int,
-    val type: String,
-    val symbol: String,
-    val quantity: Int,
-    val price: Double,
-    val date: String
-)
-
-private val demoTransactions = listOf(
-    DemoTransaction(1, "BUY", "RELIANCE", 10, 1450.0, "24 Sep 2026"),
-    DemoTransaction(2, "SELL", "TCS", 2, 3200.0, "23 Sep 2026"),
-    DemoTransaction(3, "BUY", "INFY", 8, 1600.0, "22 Sep 2026"),
-    DemoTransaction(4, "SELL", "ITC", 10, 420.0, "21 Sep 2026"),
-    DemoTransaction(5, "BUY", "HDFCBANK", 3, 1780.0, "20 Sep 2026"),
-    DemoTransaction(6, "BUY", "TCS", 7, 3200.0, "19 Sep 2026"),
-    DemoTransaction(7, "BUY", "ITC", 20, 420.0, "18 Sep 2026"),
-    DemoTransaction(8, "SELL", "SBIN", 5, 735.0, "17 Sep 2026"),
-    DemoTransaction(9, "BUY", "WIPRO", 15, 480.0, "16 Sep 2026"),
-    DemoTransaction(10, "BUY", "AXISBANK", 6, 1100.0, "15 Sep 2026"),
-    DemoTransaction(11, "BUY", "SBIN", 17, 725.0, "14 Sep 2026"),
-    DemoTransaction(12, "SELL", "RELIANCE", 3, 1480.0, "13 Sep 2026")
-)
-
-private fun transactionMoney(amount: Double): String {
-    val formatter = NumberFormat.getNumberInstance(
-        Locale("en", "IN")
-    )
-    formatter.minimumFractionDigits = 2
-    formatter.maximumFractionDigits = 2
-    return "₹${formatter.format(amount)}"
-}
+private fun txMoney(value: Double): String =
+    "₹" + NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }.format(value)
 
 @Composable
-fun TransactionsScreen(
-    onBackClick: () -> Unit = {}
-) {
-    var selectedFilter by rememberSaveable {
-        mutableStateOf("ALL")
-    }
+fun TransactionsScreen(onBackClick: () -> Unit = {}) {
+    var filter by rememberSaveable { mutableStateOf("ALL") }
 
-    val filteredTransactions = demoTransactions.filter {
-        selectedFilter == "ALL" || it.type == selectedFilter
-    }
+    val txs = TradingStore.transactions.toList()
+        .filter { filter == "ALL" || it.type == filter }
+
+    val formatter = SimpleDateFormat(
+        "dd MMM yyyy, hh:mm a",
+        Locale("en", "IN")
+    )
 
     BackHandler(onBack = onBackClick)
 
     Column(
-        modifier = Modifier
+        Modifier
             .fillMaxSize()
-            .background(TransactionBg)
+            .background(TxBg)
+            .padding(16.dp)
     ) {
-
-        // FIXED HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(TransactionNavy)
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onBackClick) {
-                Text(
-                    "← Back",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(Modifier.width(8.dp))
-
-            Text(
-                "Transaction History",
-                color = Color.White,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold
-            )
+        TextButton(onClick = onBackClick) {
+            Text("‹ Back", color = TxText)
         }
 
-        // FILTER BUTTONS
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf("ALL", "BUY", "SELL").forEach { filter ->
-                Button(
-                    onClick = {
-                        selectedFilter = filter
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (selectedFilter == filter)
-                            TransactionNavy
-                        else
-                            Color(0xFFE2E8F0),
-                        contentColor = if (selectedFilter == filter)
-                            Color.White
-                        else
-                            TransactionNavy
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
-                    Text(
-                        filter,
-                        fontWeight = FontWeight.Bold
+        Text(
+            "Transactions",
+            color = TxText,
+            fontSize = 27.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            "Your executed paper trades",
+            color = TxMuted,
+            fontSize = 13.sp
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("ALL", "BUY", "SELL").forEach { option ->
+                FilterChip(
+                    selected = filter == option,
+                    onClick = { filter = option },
+                    label = { Text(option) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = TxGreen,
+                        selectedLabelColor = Color(0xFF062017),
+                        labelColor = TxText
                     )
-                }
+                )
             }
         }
 
         Text(
-            "${filteredTransactions.size} Transactions",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = TransactionNavy,
-            modifier = Modifier.padding(
-                start = 16.dp,
-                bottom = 12.dp
-            )
+            "${txs.size} transactions",
+            color = TxMuted,
+            modifier = Modifier.padding(vertical = 10.dp)
         )
 
-        // VERTICALLY SCROLLABLE LIST
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            userScrollEnabled = true,
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 8.dp,
-                bottom = 24.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(
-                items = filteredTransactions,
-                key = { it.id }
-            ) { transaction ->
-                DemoTransactionCard(transaction)
-            }
-        }
-
-        // FIXED BOTTOM BUTTON
-        Button(
-            onClick = onBackClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .height(52.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = TransactionGreen
-            ),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                "← Back to Portfolio",
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-private fun DemoTransactionCard(
-    transaction: DemoTransaction
-) {
-    val typeColor = if (transaction.type == "BUY")
-        TransactionGreen
-    else
-        TransactionRed
-
-    val totalAmount = transaction.quantity * transaction.price
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        if (txs.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = TxCard),
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Text(
-                    transaction.type,
-                    color = typeColor,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    transactionMoney(totalAmount),
-                    color = TransactionNavy,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text(
+                        "No transactions yet",
+                        color = TxText,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Your completed buy and sell orders will appear here.",
+                        color = TxMuted
+                    )
+                }
             }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 18.dp)
+            ) {
+                items(txs, key = { it.id }) { tx ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = TxCard),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = if (tx.type == "BUY")
+                                        Color(0xFF124B3D)
+                                    else
+                                        Color(0xFF542B36),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        tx.type,
+                                        color = if (tx.type == "BUY") TxGreen else TxRed,
+                                        modifier = Modifier.padding(
+                                            horizontal = 10.dp,
+                                            vertical = 5.dp
+                                        ),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
 
-            Spacer(Modifier.height(10.dp))
+                                Text(
+                                    txMoney(tx.total),
+                                    color = TxText,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
 
-            Text(
-                transaction.symbol,
-                color = TransactionNavy,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+                            Spacer(Modifier.height(10.dp))
 
-            Spacer(Modifier.height(6.dp))
+                            Text(
+                                tx.symbol,
+                                color = TxText,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
 
-            Text(
-                "${transaction.quantity} shares @ " +
-                        transactionMoney(transaction.price),
-                color = TransactionGray,
-                fontSize = 13.sp
-            )
+                            Text(
+                                "${tx.quantity} shares @ ${txMoney(tx.price)}",
+                                color = TxMuted,
+                                fontSize = 13.sp
+                            )
 
-            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(6.dp))
 
-            Text(
-                transaction.date,
-                color = TransactionGray,
-                fontSize = 12.sp
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            Text(
-                "● Completed",
-                color = TransactionGreen,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium
-            )
+                            Text(
+                                formatter.format(Date(tx.timestamp)),
+                                color = TxMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

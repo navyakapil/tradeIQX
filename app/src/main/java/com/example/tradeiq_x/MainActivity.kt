@@ -26,7 +26,7 @@ private val Red = Color(0xFFDC2626)
 
 
 
-eenum class AppScreen {
+enum class AppScreen {
     WELCOME,
     LOGIN,
     SIGNUP,
@@ -71,6 +71,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun TradeIQXApp() {
     var screen by remember { mutableStateOf(AppScreen.WELCOME) }
+    var selectedStock by remember {
+        mutableStateOf("RELIANCE")
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -98,32 +101,51 @@ fun TradeIQXApp() {
                 onTransactions = { screen = AppScreen.TRANSACTIONS }
             )
             AppScreen.MARKET_WATCH -> MarketWatchScreen(
-                onStockSelected = { screen = AppScreen.STOCK_DETAILS },
+                onStockSelected = { symbol ->
+                    selectedStock = symbol
+                    screen = AppScreen.STOCK_DETAILS
+                },
                 onBack = { screen = AppScreen.HOME }
             )
 
             AppScreen.STOCK_DETAILS -> StockDetailsScreen(
+                symbol = selectedStock,
                 onBuy = { screen = AppScreen.BUY },
                 onSell = { screen = AppScreen.SELL },
-                onBack = { screen = AppScreen.HOME }
+                onBack = { screen = AppScreen.MARKET_WATCH }
             )
 
+
             AppScreen.BUY -> BuyScreen(
+                symbol = selectedStock,
                 onBack = { screen = AppScreen.STOCK_DETAILS },
-                onSell = { screen = AppScreen.SELL }
+                onSell = { screen = AppScreen.SELL },
+                onOrderSuccess = {
+                    screen = AppScreen.PORTFOLIO
+                }
             )
 
             AppScreen.SELL -> SellScreen(
-                onBack = { screen = AppScreen.STOCK_DETAILS }
+                symbol = selectedStock,
+                onBack = { screen = AppScreen.STOCK_DETAILS },
+                onOrderSuccess = {
+                    screen = AppScreen.PORTFOLIO
+                }
             )
 
             AppScreen.PORTFOLIO -> PortfolioScreen(
-                onBackClick = { screen = AppScreen.HOME }
+                onBackClick = { screen = AppScreen.HOME },
+                onTransactionsClick = {
+                    screen = AppScreen.TRANSACTIONS
+                }
             )
 
             AppScreen.TRANSACTIONS -> TransactionsScreen(
-                onBackClick = { screen = AppScreen.HOME }
+                onBackClick = {
+                    screen = AppScreen.PORTFOLIO
+                }
             )
+
 
         }
     }
@@ -446,10 +468,12 @@ fun HomeScreen(
                 Text("Available Virtual Balance", color = Color.LightGray)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "₹10,00,000",
-                    color = Color.White,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "₹" + java.text.NumberFormat
+                        .getNumberInstance(java.util.Locale("en", "IN"))
+                        .format(TradingStore.balance.value),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(

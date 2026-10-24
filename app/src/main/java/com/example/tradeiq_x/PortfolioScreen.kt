@@ -8,198 +8,211 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.NumberFormat
 import java.util.Locale
 
-private val PortfolioNavy = Color(0xFF0F172A)
-private val PortfolioGreen = Color(0xFF16A34A)
-private val PortfolioRed = Color(0xFFEF4444)
-private val PortfolioBg = Color(0xFFF8FAFC)
+private val PortBg = Color(0xFF071522)
+private val PortCard = Color(0xFF132838)
+private val PortGreen = Color(0xFF32D49A)
+private val PortRed = Color(0xFFFF5364)
+private val PortText = Color(0xFFF8FAFC)
+private val PortMuted = Color(0xFF9FB0C0)
 
-private data class PortfolioHolding(
-    val symbol: String,
-    val quantity: Int,
-    val averagePrice: Double,
-    val currentPrice: Double
-)
-
-private val sampleHoldings = listOf(
-    PortfolioHolding("RELIANCE", 10, 1450.0, 1480.0),
-    PortfolioHolding("TCS", 5, 3200.0, 3150.0),
-    PortfolioHolding("INFY", 8, 1600.0, 1625.0),
-    PortfolioHolding("HDFCBANK", 3, 1780.0, 1800.0),
-    PortfolioHolding("ITC", 10, 420.0, 418.0),
-    PortfolioHolding("SBIN", 12, 725.0, 735.0),
-    PortfolioHolding("WIPRO", 15, 480.0, 495.0),
-    PortfolioHolding("AXISBANK", 6, 1100.0, 1125.0)
-)
+private fun portMoney(value: Double): String =
+    "₹" + NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }.format(value)
 
 @Composable
 fun PortfolioScreen(
     onBackClick: () -> Unit = {},
     onTransactionsClick: () -> Unit = {}
 ) {
-    val invested = sampleHoldings.sumOf {
-        it.quantity * it.averagePrice
+    val holdings = TradingStore.holdings.toMap()
+        .filterValues { it > 0 }
+
+    val invested = holdings.entries.sumOf { (symbol, qty) ->
+        (TradingStore.averagePrices[symbol] ?: 0.0) * qty
     }
 
-    val current = sampleHoldings.sumOf {
-        it.quantity * it.currentPrice
+    val currentValue = holdings.entries.sumOf { (symbol, qty) ->
+        (TradingStore.prices[symbol] ?: 0.0) * qty
     }
 
-    val profit = current - invested
-    val profitColor = if (profit >= 0) PortfolioGreen else PortfolioRed
+    val profit = currentValue - invested
+    val totalValue = TradingStore.balance.value + currentValue
 
     Column(
-        modifier = Modifier
+        Modifier
             .fillMaxSize()
-            .background(PortfolioBg)
+            .background(PortBg)
+            .padding(16.dp)
     ) {
-        // Portfolio header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(PortfolioNavy)
-                .padding(20.dp)
-        ) {
-            Column {
-                TextButton(onClick = onBackClick) {
-                    Text("← Back", color = Color.White)
-                }
-
-                Text(
-                    text = "My Portfolio",
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
+        TextButton(onClick = onBackClick) {
+            Text("‹ Back", color = PortText)
         }
 
-        // Vertically scrollable portfolio content
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Text(
+            "My Portfolio",
+            color = PortText,
+            fontSize = 27.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            "Your paper-trading performance",
+            color = PortMuted,
+            fontSize = 13.sp
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = PortCard),
+            shape = RoundedCornerShape(18.dp)
         ) {
-            // Portfolio summary
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFF0FDF4)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                Text(
+                    "TOTAL PORTFOLIO VALUE",
+                    color = PortMuted,
+                    fontSize = 12.sp
+                )
+
+                Text(
+                    portMoney(totalValue),
+                    color = PortText,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    "${if (profit >= 0) "+" else ""}${portMoney(profit)} unrealized P&L",
+                    color = if (profit >= 0) PortGreen else PortRed
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Invested", color = PortMuted, fontSize = 12.sp)
                         Text(
-                            text = "Total Portfolio Value",
-                            color = Color.Gray
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "₹${String.format(Locale.US, "%,.2f", current)}",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PortfolioNavy
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "P&L: ₹${String.format(Locale.US, "%,.2f", profit)}",
-                            color = profitColor,
-                            fontWeight = FontWeight.Bold
+                            portMoney(invested),
+                            color = PortText,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
-                }
-            }
 
-            // Invested amount
-            item {
-                Text(
-                    text = "Invested Value: ₹${String.format(Locale.US, "%,.2f", invested)}",
-                    fontWeight = FontWeight.Medium,
-                    color = PortfolioNavy
-                )
-            }
-
-            // Holdings heading
-            item {
-                Text(
-                    text = "My Holdings (${sampleHoldings.size})",
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PortfolioNavy
-                )
-            }
-
-            // Individual stock holdings
-            items(sampleHoldings) { stock ->
-                val stockProfit =
-                    stock.quantity * (stock.currentPrice - stock.averagePrice)
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Available cash", color = PortMuted, fontSize = 12.sp)
                         Text(
-                            text = stock.symbol,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PortfolioNavy
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text("Quantity: ${stock.quantity}")
-                        Text("Average Price: ₹${stock.averagePrice}")
-                        Text("Current Price: ₹${stock.currentPrice}")
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "P&L: ₹${String.format(Locale.US, "%,.2f", stockProfit)}",
-                            color = if (stockProfit >= 0) {
-                                PortfolioGreen
-                            } else {
-                                PortfolioRed
-                            },
-                            fontWeight = FontWeight.Bold
+                            portMoney(TradingStore.balance.value),
+                            color = PortGreen,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
             }
         }
 
-        // Fixed transaction-history button
+        Spacer(Modifier.height(18.dp))
+
+        Text(
+            "Holdings (${holdings.size})",
+            color = PortText,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        if (holdings.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = PortCard),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text("No holdings yet", color = PortText, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Buy shares from Market Watch to see them here.",
+                        color = PortMuted
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(holdings.entries.toList(), key = { it.key }) { entry ->
+                    val symbol = entry.key
+                    val qty = entry.value
+                    val avg = TradingStore.averagePrices[symbol] ?: 0.0
+                    val price = TradingStore.prices[symbol] ?: 0.0
+                    val pnl = (price - avg) * qty
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = PortCard),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    symbol,
+                                    color = PortText,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    portMoney(price * qty),
+                                    color = PortText,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            Text(
+                                "$qty shares · Avg. ${portMoney(avg)} · Current ${portMoney(price)}",
+                                color = PortMuted,
+                                fontSize = 12.sp
+                            )
+
+                            Spacer(Modifier.height(6.dp))
+
+                            Text(
+                                "P&L: ${portMoney(pnl)}",
+                                color = if (pnl >= 0) PortGreen else PortRed,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
         Button(
             onClick = onTransactionsClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .height(52.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = PortfolioGreen
-            )
+                containerColor = PortGreen,
+                contentColor = Color(0xFF062017)
+            ),
+            shape = RoundedCornerShape(14.dp)
         ) {
-            Text("View Transaction History →")
+            Text("View Transactions →", fontWeight = FontWeight.Bold)
         }
     }
 }
