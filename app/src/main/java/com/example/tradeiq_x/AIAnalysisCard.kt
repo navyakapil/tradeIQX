@@ -1,7 +1,5 @@
+
 package com.example.tradeiq_x
-
-
-
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,8 +11,56 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+data class StockAnalysis(
+    val signal: String,
+    val risk: String,
+    val explanation: String
+)
+
+fun analyzeStock(symbol: String): StockAnalysis {
+    return when (symbol.uppercase()) {
+        "RELIANCE" -> StockAnalysis(
+            signal = "HOLD",
+            risk = "Medium",
+            explanation = "Sample neutral outlook for this stock."
+        )
+
+        "TCS" -> StockAnalysis(
+            signal = "BUY",
+            risk = "Low",
+            explanation = "Sample positive outlook for this stock."
+        )
+
+        "INFY" -> StockAnalysis(
+            signal = "SELL",
+            risk = "High",
+            explanation = "Sample negative outlook for this stock."
+        )
+
+        "HDFCBANK" -> StockAnalysis(
+            signal = "HOLD",
+            risk = "Medium",
+            explanation = "Sample mixed outlook for this stock."
+        )
+
+        else -> StockAnalysis(
+            signal = "HOLD",
+            risk = "Unknown",
+            explanation = "No sample analysis is available."
+        )
+    }
+}
+
 @Composable
 fun AIAnalysisCard(symbol: String) {
+    val analysis = analyzeStock(symbol)
+
+    val signalColor = when (analysis.signal) {
+        "BUY" -> Color(0xFF32D49A)
+        "SELL" -> Color(0xFFFF6B6B)
+        else -> Color(0xFFFFD166)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -39,20 +85,24 @@ fun AIAnalysisCard(symbol: String) {
             )
 
             Text(
-                text = "Analysis: HOLD (Demo)",
-                color = Color(0xFF32D49A),
+                text = "Simulated Signal: ${analysis.signal}",
+                color = signalColor,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
-                text = "This is a sample educational insight. " +
-                        "A trained AI model has not yet analyzed this stock.",
+                text = "Risk Indicator: ${analysis.risk} (Demo)",
+                color = Color.White
+            )
+
+            Text(
+                text = analysis.explanation,
                 color = Color.White,
                 fontSize = 14.sp
             )
 
             Text(
-                text = "Demo only · Not investment advice",
+                text = "Fixed sample data, not a real AI prediction or investment advice.",
                 color = Color(0xFF9FB0C0),
                 fontSize = 12.sp
             )
