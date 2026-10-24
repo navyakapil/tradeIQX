@@ -26,11 +26,12 @@ private val Red = Color(0xFFDC2626)
 
 
 
-enum class AppScreen {
+eenum class AppScreen {
     WELCOME,
     LOGIN,
     SIGNUP,
     HOME,
+    MARKET_WATCH,
     STOCK_DETAILS,
     BUY,
     SELL,
@@ -92,9 +93,13 @@ fun TradeIQXApp() {
 
             AppScreen.HOME -> HomeScreen(
                 onLogout = { screen = AppScreen.WELCOME },
-                onMarketWatch = { screen = AppScreen.STOCK_DETAILS },
+                onMarketWatch = { screen = AppScreen.MARKET_WATCH },
                 onPortfolio = { screen = AppScreen.PORTFOLIO },
                 onTransactions = { screen = AppScreen.TRANSACTIONS }
+            )
+            AppScreen.MARKET_WATCH -> MarketWatchScreen(
+                onStockSelected = { screen = AppScreen.STOCK_DETAILS },
+                onBack = { screen = AppScreen.HOME }
             )
 
             AppScreen.STOCK_DETAILS -> StockDetailsScreen(
