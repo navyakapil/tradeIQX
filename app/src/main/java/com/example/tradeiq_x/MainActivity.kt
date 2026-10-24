@@ -17,6 +17,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
+import com.example.tradeiq_x.ui.AIChatbotScreen
+
 private val Green = Color(0xFF16A34A)
 private val DarkGreen = Color(0xFF15803D)
 private val Dark = Color(0xFF0F172A)
@@ -26,7 +28,7 @@ private val Red = Color(0xFFDC2626)
 
 
 
-eenum class AppScreen {
+enum class AppScreen {
     WELCOME,
     LOGIN,
     SIGNUP,
@@ -36,6 +38,7 @@ eenum class AppScreen {
     BUY,
     SELL,
     PORTFOLIO,
+    AI_CHATBOT,
     TRANSACTIONS
 }
 
@@ -95,7 +98,8 @@ fun TradeIQXApp() {
                 onLogout = { screen = AppScreen.WELCOME },
                 onMarketWatch = { screen = AppScreen.MARKET_WATCH },
                 onPortfolio = { screen = AppScreen.PORTFOLIO },
-                onTransactions = { screen = AppScreen.TRANSACTIONS }
+                onTransactions = { screen = AppScreen.TRANSACTIONS },
+                onAIChatbot = { screen = AppScreen.AI_CHATBOT }
             )
             AppScreen.MARKET_WATCH -> MarketWatchScreen(
                 onStockSelected = { screen = AppScreen.STOCK_DETAILS },
@@ -123,6 +127,10 @@ fun TradeIQXApp() {
 
             AppScreen.TRANSACTIONS -> TransactionsScreen(
                 onBackClick = { screen = AppScreen.HOME }
+            )
+
+            AppScreen.AI_CHATBOT -> AIChatbotScreen(
+                onBack = { screen = AppScreen.HOME }
             )
 
         }
@@ -399,7 +407,8 @@ fun HomeScreen(
     onLogout: () -> Unit,
     onMarketWatch: () -> Unit,
     onPortfolio: () -> Unit,
-    onTransactions: () -> Unit
+    onTransactions: () -> Unit,
+    onAIChatbot: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -497,6 +506,13 @@ fun HomeScreen(
         )
         QuickAccessCard("💼", "My Portfolio", "View your holdings",onClick = onPortfolio)
         QuickAccessCard("↔", "Transactions", "Review your paper trades",onClick = onTransactions)
+
+        QuickAccessCard(
+            "✦",
+            "AI Assistant",
+            "Ask questions about stocks and investing",
+            onClick = onAIChatbot
+        )
 
         Spacer(Modifier.height(20.dp))
 
