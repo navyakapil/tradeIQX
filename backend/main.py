@@ -20,7 +20,7 @@ app = FastAPI(title="TradeIQX API")
 Base.metadata.create_all(bind=engine)
 
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["bcrypt_sha256"],
     deprecated="auto"
 )
 
@@ -31,7 +31,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
 
 def hash_password(password: str):
     return pwd_context.hash(password)

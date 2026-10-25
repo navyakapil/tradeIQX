@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
+import kotlinx.coroutines.launch
 private val Green = Color(0xFF16A34A)
 private val DarkGreen = Color(0xFF15803D)
 private val Dark = Color(0xFF0F172A)
@@ -217,6 +218,7 @@ fun WelcomeScreen(onGetStarted: () -> Unit) {
     }
 }
 
+
 @Composable
 fun LoginScreen(
     onLogin: () -> Unit,
@@ -224,6 +226,10 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -272,10 +278,42 @@ fun LoginScreen(
             shape = RoundedCornerShape(12.dp)
         )
 
+        if (error.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(error, color = Red, fontSize = 13.sp)
+        }
+
         Spacer(Modifier.height(24.dp))
 
         Button(
-            onClick = onLogin,
+            onClick = {
+                error = when {
+                    email.isBlank() || password.isBlank() ->
+                        "Please enter your email and password."
+                    !email.contains("@") ->
+                        "Enter a valid email address."
+                    else -> ""
+                }
+
+                if (error.isEmpty() && !isLoading) {
+                    scope.launch {
+                        isLoading = true
+                        try {
+                            BackendApi.login(
+                                email = email.trim(),
+                                password = password
+                            )
+                            onLogin()
+                        } catch (e: Exception) {
+                            error = e.message
+                                ?: "Login failed. Please try again."
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                }
+            },
+            enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -284,20 +322,18 @@ fun LoginScreen(
                 containerColor = Green
             )
         ) {
-            Text("Login")
+            Text(if (isLoading) "Logging in..." else "Login")
         }
 
         TextButton(onClick = onSignUp) {
-            Text("New here? Create an account", color = DarkGreen)
+            Text(
+                "New here? Create an account",
+                color = DarkGreen
+            )
         }
-
-        Text(
-            "Demo only: login currently opens the dashboard.",
-            color = Grey,
-            fontSize = 12.sp
-        )
     }
 }
+
 
 @Composable
 fun SignUpScreen(
@@ -309,6 +345,8 @@ fun SignUpScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -399,10 +437,25 @@ fun SignUpScreen(
                     password != confirmPassword ->
                         "Passwords do not match."
 
-                    else -> ""
-                }
+                    else -> ""    }
 
-                if (error.isEmpty()) onCreateAccount()
+                if (error.isEmpty()) {
+                    scope.launch {
+                        isLoading = true
+                        try {
+                            BackendApi.signup(
+                                username = name,
+                                email = email,
+                                password = password
+                            )
+                            onCreateAccount()
+                        } catch (e: Exception) {
+                            error = e.message ?: "Signup failed. Please try again."
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                }
             },
             modifier = Modifier
                 .fillMaxWidth()

@@ -8,15 +8,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object BackendApi {
-
     private const val BASE_URL = "http://10.0.2.2:8001"
 
     private suspend fun post(
         endpoint: String,
-        email: String,
-        password: String
+        data: JSONObject
     ): JSONObject = withContext(Dispatchers.IO) {
-
         val connection = URL("$BASE_URL$endpoint")
             .openConnection() as HttpURLConnection
 
@@ -25,23 +22,13 @@ object BackendApi {
             connection.connectTimeout = 10000
             connection.readTimeout = 10000
             connection.doOutput = true
-
-            connection.setRequestProperty(
-                "Content-Type",
-                "application/json"
-            )
-
-            val body = JSONObject().apply {
-                put("email", email)
-                put("password", password)
-            }
+            connection.setRequestProperty("Content-Type", "application/json")
 
             connection.outputStream.use {
-                it.write(body.toString().toByteArray(Charsets.UTF_8))
+                it.write(data.toString().toByteArray(Charsets.UTF_8))
             }
 
             val status = connection.responseCode
-
             val stream = if (status in 200..299) {
                 connection.inputStream
             } else {
@@ -61,36 +48,40 @@ object BackendApi {
                 } catch (_: Exception) {
                     "Request failed: $status"
                 }
-
                 throw Exception(message)
             }
 
             JSONObject(response)
-
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun credentials(
+        email: String,
+        password: String
+    ): JSONObject = JSONObject().apply {
+        put("email", email)
+        put("password", password)
     }
 
     suspend fun signup(
         email: String,
         password: String
     ): JSONObject {
-        return post("/auth/signup", email, password)
+        return post("/auth/signup", credentials(email, password))
     }
 
     suspend fun login(
         email: String,
         password: String
     ): JSONObject {
-        return post("/auth/login", email, password)
+        return post("/auth/login", credentials(email, password))
     }
 
     suspend fun getLiveQuote(symbol: String): JSONObject =
         withContext(Dispatchers.IO) {
-
             val safeSymbol = symbol.trim().uppercase()
-
             require(safeSymbol.matches(Regex("[A-Z0-9]+"))) {
                 "Invalid stock symbol"
             }
@@ -105,7 +96,6 @@ object BackendApi {
                 connection.readTimeout = 15000
 
                 val status = connection.responseCode
-
                 val stream = if (status in 200..299) {
                     connection.inputStream
                 } else {
@@ -125,12 +115,10 @@ object BackendApi {
                     } catch (_: Exception) {
                         "Quote request failed: $status"
                     }
-
                     throw Exception(message)
                 }
 
                 JSONObject(response)
-
             } finally {
                 connection.disconnect()
             }
