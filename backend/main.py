@@ -1,4 +1,4 @@
-
+from market_data import get_live_quote
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Dict
@@ -54,7 +54,34 @@ def home():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+@app.get("/market/quote/{symbol}")
+def market_quote(symbol: str):
+    try:
+        return get_live_quote(symbol)
 
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc),
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Market data provider request failed",
+        )
 @app.get("/portfolio")
 def get_portfolio(db: Session = Depends(get_db)):
     portfolio = db.query(Portfolio).first()
