@@ -11,6 +11,7 @@ from database import SessionLocal, engine
 from models import Base, User, Portfolio, Holding, Trade
 import schemas
 
+TradeRequest = schemas.TradeRequest
 from passlib.context import CryptContext
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -23,13 +24,7 @@ pwd_context = CryptContext(
     deprecated="auto"
 )
 
-# Temporary in-memory paper-trading data.
-# We will replace this with SQL persistence in the next step.
-INITIAL_BALANCE = 100000.0
 
-cash_balance = INITIAL_BALANCE
-holdings: Dict[str, int] = {}
-transactions = []
 def get_db():
     db = SessionLocal()
     try:
@@ -60,47 +55,162 @@ def home():
 def health_check():
     return {"status": "healthy"}
 
-
 @app.get("/portfolio")
-def get_portfolio():
-    return {
-        "cash_balance": round(cash_balance, 2),
-        "holdings": holdings,
-        "transactions": transactions,
-    }
+def get_portfolio(db: Session = Depends(get_db)):
+    portfolio = db.query(Portfolio).first()
 
+    if portfolio is None:
+        return {
+            "cash_balance": 100000.0,
+            "holdings": {},
+            "transactions": [],
+        }
+
+    user_holdings = db.query(Holding).filter(
+        Holding.user_id == portfolio.user_id
+    ).all()
+
+    user_trades = (
+        db.query(Trade)
+        .filter(Trade.user_id == portfolio.user_id)
+        .order_by(Trade.created_at.desc())
+        .all()
+    )
+
+    return {
+        "cash_balance": round(portfolio.cash_balance, 2),
+        "holdings": {
+            holding.symbol: holding.quantity
+            for holding in user_holdings
+        },
+        "transactions": [
+            {
+                "symbol": trade.symbol,
+                "side": trade.side,
+                "quantity": trade.quantity,
+                "price": trade.price,
+                "total": trade.total,
+                "created_at": (
+                    trade.created_at.isoformat()
+                    if trade.created_at else None
+                ),
+            }
+            for trade in user_trades
+        ],
+    }
 
 @app.post("/buy")
-def buy_stock(trade: TradeRequest):
-    global cash_balance
-
+def buy_stock(
+    trade: TradeRequest,
+    db: Session = Depends(get_db)
+):
     symbol = trade.symbol.strip().upper()
+
     if not symbol:
-        raise HTTPException(status_code=400, detail="Stock symbol is required")
+        raise HTTPException(
+            status_code=400,
+            detail="Stock symbol is required"
+        )
 
-    total_cost = trade.quantity * trade.price
+    if trade.quantity <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Quantity must be greater than zero"
+        )
 
-    if total_cost > cash_balance:
-        raise HTTPException(status_code=400, detail="Insufficient virtual cash")
+    if trade.price <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Price must be greater than zero"
+        )
 
-    cash_balance = round(cash_balance - total_cost, 2)
-    holdings[symbol] = holdings.get(symbol, 0) + trade.quantity
+    # Temporary single-user implementation.
+    # We will connect this to the authenticated user next.
+    portfolio = db.query(Portfolio).first()
 
-    transaction = {
-        "symbol": symbol,
-        "side": "BUY",
-        "quantity": trade.quantity,
-        "price": trade.price,
-        "total": round(total_cost, 2),
-    }
-    transactions.append(transaction)
+    if portfolio is None:
+        portfolio = Portfolio(
+            user_id=1,
+            cash_balance=INITIAL_BALANCE
+        )
+        db.add(portfolio)
+        db.flush()
+
+    total_cost = round(trade.quantity * trade.price, 2)
+
+    if total_cost > portfolio.cash_balance:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient virtual cash"
+        )
+
+    holding = (
+        db.query(Holding)
+        .filter(
+            Holding.user_id == portfolio.user_id,
+            Holding.symbol == symbol
+        )
+        .first()
+    )
+
+    if holding is None:
+        holding = Holding(
+            user_id=portfolio.user_id,
+            symbol=symbol,
+            quantity=0,
+            average_price=0.0
+        )
+        db.add(holding)
+        db.flush()
+
+    old_quantity = holding.quantity
+    new_quantity = old_quantity + trade.quantity
+
+    holding.average_price = round(
+        (
+            old_quantity * holding.average_price
+            + trade.quantity * trade.price
+        ) / new_quantity,
+        2
+    )
+
+    holding.quantity = new_quantity
+    portfolio.cash_balance = round(
+        portfolio.cash_balance - total_cost,
+        2
+    )
+
+    transaction = Trade(
+        user_id=portfolio.user_id,
+        symbol=symbol,
+        side="BUY",
+        quantity=trade.quantity,
+        price=trade.price,
+        total=total_cost
+    )
+
+    db.add(transaction)
+    db.commit()
 
     return {
         "message": "Paper trade completed",
-        "transaction": transaction,
-        "portfolio": get_portfolio(),
+        "transaction": {
+            "symbol": symbol,
+            "side": "BUY",
+            "quantity": trade.quantity,
+            "price": trade.price,
+            "total": total_cost
+        },
+        "portfolio": {
+            "cash_balance": portfolio.cash_balance,
+            "holdings": {
+                item.symbol: item.quantity
+                for item in db.query(Holding)
+                .filter(Holding.user_id == portfolio.user_id)
+                .all()
+            }
+        }
     }
-
 
 @app.post("/sell")
 def sell_stock(trade: TradeRequest):
