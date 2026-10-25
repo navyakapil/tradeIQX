@@ -224,6 +224,8 @@ fun StockDetailsScreen(
                 modifier = Modifier.weight(1f)
             )
         }
+        // AI Analysis Section
+        AIAnalysisCard(symbol = stock)
 
         // Trading actions
         Row(
