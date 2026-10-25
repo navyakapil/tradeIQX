@@ -1,22 +1,78 @@
 
-
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Log
+import kotlinx.coroutines.CancellationException
 
 @Composable
 fun AIAnalysisCard(symbol: String) {
 
-    // Get calculated results from StockAnalysisEngine.kt
-    val analysis = StockAnalysisEngine.analyze(symbol)
+    // Local simulated stock analysis
+    val analysis = remember(symbol) {
+        StockAnalysisEngine.analyze(symbol)
+    }
+
+    var backendExplanation by remember(symbol) {
+        mutableStateOf("")
+    }
+
+    var isLoading by remember(symbol) {
+        mutableStateOf(true)
+    }
+
+    var backendConnected by remember(symbol) {
+        mutableStateOf(false)
+    }
+
+    // Request explanation from FastAPI
+    LaunchedEffect(symbol) {
+
+        isLoading = true
+        backendConnected = false
+        backendExplanation = ""
+
+        try {
+            backendExplanation = AIService.getStockExplanation(
+                symbol = symbol,
+                analysis = analysis
+            )
+
+            backendConnected = true
+
+            Log.d(
+                "TradeIQX_AI",
+                "Backend analysis connected successfully"
+            )
+
+        } catch (e: CancellationException) {
+            throw e
+
+        } catch (e: Exception) {
+
+            Log.e(
+                "TradeIQX_AI",
+                "Backend analysis request failed",
+                e
+            )
+
+            backendExplanation =
+                "Connection error: ${e.message ?: "Unknown error"}"
+
+            backendConnected = false
+
+        } finally {
+            isLoading = false
+        }
+    }
 
     val signalColor = when (analysis.signal) {
         "BUY" -> Color(0xFF32D49A)
@@ -31,10 +87,12 @@ fun AIAnalysisCard(symbol: String) {
             containerColor = Color(0xFF132838)
         )
     ) {
+
         Column(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+
             Text(
                 text = "AI Stock Analysis",
                 color = Color.White,
@@ -62,6 +120,60 @@ fun AIAnalysisCard(symbol: String) {
                 text = analysis.explanation,
                 color = Color.White,
                 fontSize = 14.sp
+            )
+
+            HorizontalDivider(
+                color = Color(0xFF355063)
+            )
+
+            Text(
+                text = "Backend Analysis Explanation",
+                color = Color(0xFF32D49A),
+                fontWeight = FontWeight.Bold
+            )
+
+            if (isLoading) {
+
+                CircularProgressIndicator(
+                    color = Color(0xFF32D49A),
+                    modifier = Modifier.size(24.dp)
+                )
+
+                Text(
+                    text = "Connecting to backend...",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+
+            } else {
+
+                Text(
+                    text = backendExplanation,
+                    color = if (backendConnected) {
+                        Color.White
+                    } else {
+                        Color(0xFFFFD166)
+                    },
+                    fontSize = 14.sp
+                )
+
+                Text(
+                    text = if (backendConnected) {
+                        "Backend connected (template explanation)"
+                    } else {
+                        "Offline: backend request failed"
+                    },
+                    color = if (backendConnected) {
+                        Color(0xFF32D49A)
+                    } else {
+                        Color(0xFFFFD166)
+                    },
+                    fontSize = 12.sp
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(4.dp)
             )
 
             Text(
