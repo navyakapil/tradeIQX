@@ -10,10 +10,10 @@ object BackendApi {
 
     private const val BASE_URL = "http://10.0.2.2:8000"
 
+
     private suspend fun post(
         endpoint: String,
-        email: String,
-        password: String
+        data: JSONObject
     ): JSONObject = withContext(Dispatchers.IO) {
 
         val connection = URL("$BASE_URL$endpoint")
@@ -30,11 +30,7 @@ object BackendApi {
                 "application/json"
             )
 
-            val body = JSONObject().apply {
-                put("email", email)
-                put("password", password)
-            }
-
+            val body = data
             connection.outputStream.use {
                 it.write(body.toString().toByteArray(Charsets.UTF_8))
             }
@@ -71,17 +67,33 @@ object BackendApi {
         }
     }
 
+
+
     suspend fun signup(
+        username: String,
         email: String,
         password: String
     ): JSONObject {
-        return post("/auth/signup", email, password)
+        val data = JSONObject().apply {
+            put("username", username)
+            put("email", email)
+            put("password", password)
+        }
+
+        return post("/auth/signup", data)
     }
+
 
     suspend fun login(
         email: String,
         password: String
     ): JSONObject {
-        return post("/auth/login", email, password)
+        val data = JSONObject().apply {
+            put("email", email)
+            put("password", password)
+        }
+
+        return post("/auth/login", data)
     }
+
 }
