@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Dict
 from fastapi import FastAPI, HTTPException
@@ -12,6 +12,8 @@ from models import Base, User
 import schemas
 
 from passlib.context import CryptContext
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 
 app = FastAPI(title="TradeIQX API")
 Base.metadata.create_all(bind=engine)
@@ -137,3 +139,59 @@ def sell_stock(trade: TradeRequest):
         "transaction": transaction,
         "portfolio": get_portfolio(),
     }
+
+@app.post("/auth/signup", response_model=schemas.UserResponse, status_code=201)
+def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
+        username = user.username.strip()
+        email = str(user.email).strip().lower()
+
+        if not username:
+            raise HTTPException(status_code=400, detail="Username is required")
+
+        if len(user.password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+        existing_user = db.query(User).filter(
+            or_(User.email == email, User.username == username)
+        ).first()
+
+        if existing_user:
+            raise HTTPException(status_code=409, detail="Email or username already registered")
+
+        new_user = User(
+            username=username,
+            email=email,
+            hashed_password=hash_password(user.password)
+        )
+
+        db.add(new_user)
+
+        try:
+            db.commit()
+            db.refresh(new_user)
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Email or username already registered")
+
+        return new_user
+
+
+@app.post("/auth/login")
+def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
+        email = str(user.email).strip().lower()
+
+        existing_user = db.query(User).filter(
+            User.email == email
+        ).first()
+
+        if not existing_user or not verify_password(
+            user.password, existing_user.hashed_password
+        ):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        return {
+            "message": "Login credentials verified",
+            "user_id": existing_user.id,
+            "username": existing_user.username,
+            "email": existing_user.email
+        }
