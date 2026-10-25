@@ -65,12 +65,20 @@ object BackendApi {
         put("password", password)
     }
 
+
     suspend fun signup(
+        username: String,
         email: String,
         password: String
     ): JSONObject {
-        return post("/auth/signup", credentials(email, password))
+        val data = JSONObject().apply {
+            put("username", username.trim())
+            put("email", email.trim())
+            put("password", password)
+        }
+        return post("/auth/signup", data)
     }
+
 
     suspend fun login(
         email: String,

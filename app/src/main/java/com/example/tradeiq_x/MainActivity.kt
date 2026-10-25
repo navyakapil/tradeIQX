@@ -1,8 +1,11 @@
+
 package com.example.tradeiq_x
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,66 +19,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.clickable
-import kotlinx.coroutines.launch
+
 private val Green = Color(0xFF16A34A)
 private val DarkGreen = Color(0xFF15803D)
 private val Dark = Color(0xFF0F172A)
 private val Background = Color(0xFFF5F7FB)
 private val Grey = Color(0xFF64748B)
-private val Red = Color(0xFFDC2626)
-
-
 
 enum class AppScreen {
-    WELCOME,
-    LOGIN,
-    SIGNUP,
-    HOME,
-    MARKET_WATCH,
-    STOCK_DETAILS,
-    BUY,
-    SELL,
-    PORTFOLIO,
-    TRANSACTIONS,
-    CHATBOT
+    WELCOME, LOGIN, SIGNUP, HOME, MARKET_WATCH,
+    STOCK_DETAILS, BUY, SELL, PORTFOLIO, TRANSACTIONS, CHATBOT
 }
 
-
-
-
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        android.util.Log.d("TradeIQX", "MainActivity onCreate")
-
         setContent {
             MaterialTheme {
                 TradeIQXApp()
             }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        android.util.Log.d("TradeIQX", "MainActivity onResume")
-    }
-
-    override fun onPause() {
-        android.util.Log.d("TradeIQX", "MainActivity onPause")
-        super.onPause()
-    }
 }
-
 
 @Composable
 fun TradeIQXApp() {
     var screen by remember { mutableStateOf(AppScreen.WELCOME) }
-    var selectedStock by remember {
-        mutableStateOf("RELIANCE")
-    }
+    var selectedStock by remember { mutableStateOf("RELIANCE") }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -103,6 +73,7 @@ fun TradeIQXApp() {
                 onTransactions = { screen = AppScreen.TRANSACTIONS },
                 onChatbot = { screen = AppScreen.CHATBOT }
             )
+
             AppScreen.MARKET_WATCH -> MarketWatchScreen(
                 onStockSelected = { symbol ->
                     selectedStock = symbol
@@ -118,22 +89,17 @@ fun TradeIQXApp() {
                 onBack = { screen = AppScreen.MARKET_WATCH }
             )
 
-
             AppScreen.BUY -> BuyScreen(
                 symbol = selectedStock,
                 onBack = { screen = AppScreen.STOCK_DETAILS },
                 onSell = { screen = AppScreen.SELL },
-                onOrderSuccess = {
-                    screen = AppScreen.PORTFOLIO
-                }
+                onOrderSuccess = { screen = AppScreen.PORTFOLIO }
             )
 
             AppScreen.SELL -> SellScreen(
                 symbol = selectedStock,
                 onBack = { screen = AppScreen.STOCK_DETAILS },
-                onOrderSuccess = {
-                    screen = AppScreen.PORTFOLIO
-                }
+                onOrderSuccess = { screen = AppScreen.PORTFOLIO }
             )
 
             AppScreen.PORTFOLIO -> PortfolioScreen(
@@ -144,17 +110,12 @@ fun TradeIQXApp() {
             )
 
             AppScreen.TRANSACTIONS -> TransactionsScreen(
-                onBackClick = {
-                    screen = AppScreen.PORTFOLIO
-                }
+                onBackClick = { screen = AppScreen.PORTFOLIO }
             )
+
             AppScreen.CHATBOT -> ChatbotScreen(
-                onBack = {
-                    screen = AppScreen.HOME
-                }
+                onBack = { screen = AppScreen.HOME }
             )
-
-
         }
     }
 }
@@ -218,7 +179,6 @@ fun WelcomeScreen(onGetStarted: () -> Unit) {
     }
 }
 
-
 @Composable
 fun LoginScreen(
     onLogin: () -> Unit,
@@ -226,10 +186,6 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-
-    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -240,7 +196,6 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center
     ) {
         BrandHeader()
-
         Spacer(Modifier.height(32.dp))
 
         Text(
@@ -250,11 +205,7 @@ fun LoginScreen(
             color = Dark
         )
 
-        Text(
-            "Log in to continue paper trading",
-            color = Grey
-        )
-
+        Text("Log in to continue paper trading", color = Grey)
         Spacer(Modifier.height(28.dp))
 
         OutlinedTextField(
@@ -278,42 +229,10 @@ fun LoginScreen(
             shape = RoundedCornerShape(12.dp)
         )
 
-        if (error.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(error, color = Red, fontSize = 13.sp)
-        }
-
         Spacer(Modifier.height(24.dp))
 
         Button(
-            onClick = {
-                error = when {
-                    email.isBlank() || password.isBlank() ->
-                        "Please enter your email and password."
-                    !email.contains("@") ->
-                        "Enter a valid email address."
-                    else -> ""
-                }
-
-                if (error.isEmpty() && !isLoading) {
-                    scope.launch {
-                        isLoading = true
-                        try {
-                            BackendApi.login(
-                                email = email.trim(),
-                                password = password
-                            )
-                            onLogin()
-                        } catch (e: Exception) {
-                            error = e.message
-                                ?: "Login failed. Please try again."
-                        } finally {
-                            isLoading = false
-                        }
-                    }
-                }
-            },
-            enabled = !isLoading,
+            onClick = { onLogin() }, // DEMO MODE: skips backend login
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -322,7 +241,7 @@ fun LoginScreen(
                 containerColor = Green
             )
         ) {
-            Text(if (isLoading) "Logging in..." else "Login")
+            Text("Login")
         }
 
         TextButton(onClick = onSignUp) {
@@ -334,7 +253,6 @@ fun LoginScreen(
     }
 }
 
-
 @Composable
 fun SignUpScreen(
     onCreateAccount: () -> Unit,
@@ -344,9 +262,6 @@ fun SignUpScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -356,7 +271,6 @@ fun SignUpScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         BrandHeader()
-
         Spacer(Modifier.height(24.dp))
 
         Text(
@@ -367,7 +281,6 @@ fun SignUpScreen(
         )
 
         Text("Start your paper-trading journey", color = Grey)
-
         Spacer(Modifier.height(24.dp))
 
         OutlinedTextField(
@@ -414,49 +327,10 @@ fun SignUpScreen(
             shape = RoundedCornerShape(12.dp)
         )
 
-        if (error.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            Text(error, color = Red, fontSize = 13.sp)
-        }
-
         Spacer(Modifier.height(20.dp))
 
         Button(
-            onClick = {
-                error = when {
-                    name.isBlank() || email.isBlank() ||
-                            password.isBlank() || confirmPassword.isBlank() ->
-                        "Please fill in all fields."
-
-                    !email.contains("@") ->
-                        "Enter a valid email address."
-
-                    password.length < 6 ->
-                        "Password must be at least 6 characters."
-
-                    password != confirmPassword ->
-                        "Passwords do not match."
-
-                    else -> ""    }
-
-                if (error.isEmpty()) {
-                    scope.launch {
-                        isLoading = true
-                        try {
-                            BackendApi.signup(
-                                username = name,
-                                email = email,
-                                password = password
-                            )
-                            onCreateAccount()
-                        } catch (e: Exception) {
-                            error = e.message ?: "Signup failed. Please try again."
-                        } finally {
-                            isLoading = false
-                        }
-                    }
-                }
-            },
+            onClick = { onCreateAccount() }, // DEMO MODE: skips backend signup
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -469,7 +343,10 @@ fun SignUpScreen(
         }
 
         TextButton(onClick = onLogin) {
-            Text("Already have an account? Login", color = DarkGreen)
+            Text(
+                "Already have an account? Login",
+                color = DarkGreen
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -483,7 +360,7 @@ fun HomeScreen(
     onPortfolio: () -> Unit,
     onTransactions: () -> Unit,
     onChatbot: () -> Unit
-){
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -496,10 +373,17 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("TradeIQX", color = Green, fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold)
-                Text("Welcome to your dashboard", color = Grey,
-                    fontSize = 13.sp)
+                Text(
+                    "TradeIQX",
+                    color = Green,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Welcome to your dashboard",
+                    color = Grey,
+                    fontSize = 13.sp
+                )
             }
 
             TextButton(onClick = onLogout) {
@@ -521,13 +405,12 @@ fun HomeScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Dark
-            )
+            colors = CardDefaults.cardColors(containerColor = Dark)
         ) {
             Column(Modifier.padding(22.dp)) {
                 Text("Available Virtual Balance", color = Color.LightGray)
                 Spacer(Modifier.height(8.dp))
+
                 Text(
                     text = "₹" + java.text.NumberFormat
                         .getNumberInstance(java.util.Locale("en", "IN"))
@@ -536,7 +419,9 @@ fun HomeScreen(
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
+
                 Spacer(Modifier.height(8.dp))
+
                 Text(
                     "Practice with virtual money",
                     color = Color(0xFF86EFAC)
@@ -580,8 +465,20 @@ fun HomeScreen(
             "Explore available shares",
             onClick = onMarketWatch
         )
-        QuickAccessCard("💼", "My Portfolio", "View your holdings",onClick = onPortfolio)
-        QuickAccessCard("↔", "Transactions", "Review your paper trades",onClick = onTransactions)
+
+        QuickAccessCard(
+            "💼",
+            "My Portfolio",
+            "View your holdings",
+            onClick = onPortfolio
+        )
+
+        QuickAccessCard(
+            "↔",
+            "Transactions",
+            "Review your paper trades",
+            onClick = onTransactions
+        )
 
         QuickAccessCard(
             "🤖",
@@ -589,6 +486,7 @@ fun HomeScreen(
             "Ask questions about stocks and investing",
             onClick = onChatbot
         )
+
         Spacer(Modifier.height(20.dp))
 
         Text(
@@ -607,12 +505,14 @@ fun BrandHeader() {
         fontSize = 48.sp,
         fontWeight = FontWeight.Bold
     )
+
     Text(
         "TradeIQX",
         color = Dark,
         fontSize = 30.sp,
         fontWeight = FontWeight.Bold
     )
+
     Text(
         "Learn. Practice. Trade Smarter.",
         color = Grey,
@@ -629,13 +529,12 @@ fun SummaryCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(Modifier.padding(14.dp)) {
             Text(title, color = Grey, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
+
             Text(
                 value,
                 color = Dark,
@@ -659,9 +558,7 @@ fun QuickAccessCard(
             .padding(vertical = 5.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(
             modifier = Modifier
@@ -671,6 +568,7 @@ fun QuickAccessCard(
         ) {
             Text(icon, fontSize = 25.sp)
             Spacer(Modifier.width(14.dp))
+
             Column {
                 Text(
                     title,
