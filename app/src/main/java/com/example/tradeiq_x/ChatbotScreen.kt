@@ -33,6 +33,9 @@ private data class ChatMessage(
 fun ChatbotScreen(
     onBack: () -> Unit = {}
 ) {
+    // Controls navigation between chatbot and AI Quiz
+    var showQuiz by remember { mutableStateOf(false) }
+
     val messages = remember {
         mutableStateListOf(
             ChatMessage(
@@ -51,37 +54,76 @@ fun ChatbotScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(messages.size, isLoading) {
-        val lastIndex = if (isLoading) messages.size else messages.lastIndex
-        if (lastIndex >= 0) {
-            listState.animateScrollToItem(lastIndex)
+    LaunchedEffect(messages.size, isLoading, showQuiz) {
+        if (!showQuiz) {
+            val lastIndex =
+                if (isLoading) messages.size else messages.lastIndex
+
+            if (lastIndex >= 0) {
+                listState.animateScrollToItem(lastIndex)
+            }
         }
     }
+
+    // ---------------------------------
+    // AI QUIZ SCREEN
+    // ---------------------------------
+
+    if (showQuiz) {
+        QuizScreen(
+            onBack = { showQuiz = false }
+        )
+        return
+    }
+
+    // ---------------------------------
+    // CHATBOT SCREEN
+    // ---------------------------------
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = ChatBackground
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
 
-            // Header
+            // ---------------------------------
+            // HEADER
+            // ---------------------------------
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(
+                        horizontal = 16.dp,
+                        vertical = 14.dp
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onBack) {
-                    Text("‹ Back", color = ChatGreen, fontSize = 16.sp)
+
+                TextButton(
+                    onClick = onBack
+                ) {
+                    Text(
+                        "‹ Back",
+                        color = ChatGreen,
+                        fontSize = 16.sp
+                    )
                 }
 
-                Spacer(modifier = Modifier.size(8.dp))
+                Spacer(
+                    modifier = Modifier.size(8.dp)
+                )
 
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .background(ChatGreen, CircleShape),
+                        .background(
+                            ChatGreen,
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -91,26 +133,56 @@ fun ChatbotScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.size(10.dp))
+                Spacer(
+                    modifier = Modifier.size(10.dp)
+                )
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         "TradeIQX AI",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = ChatText
                     )
+
                     Text(
                         "Your market learning assistant",
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
                 }
+
+                // NEW AI QUIZ BUTTON
+                Button(
+                    onClick = {
+                        showQuiz = true
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ChatGreen
+                    ),
+                    contentPadding = PaddingValues(
+                        horizontal = 10.dp,
+                        vertical = 6.dp
+                    )
+                ) {
+                    Text(
+                        "Take AI Quiz",
+                        color = Color.White,
+                        fontSize = 11.sp
+                    )
+                }
             }
 
-            HorizontalDivider(color = Color(0xFFE5E7EB))
+            HorizontalDivider(
+                color = Color(0xFFE5E7EB)
+            )
 
-            // Conversation
+            // ---------------------------------
+            // CHAT CONVERSATION
+            // ---------------------------------
+
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -119,33 +191,53 @@ fun ChatbotScreen(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+
                 item {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
                 }
 
                 items(messages) { message ->
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = if (message.isUser) {
-                            Arrangement.End
-                        } else {
-                            Arrangement.Start
-                        }
+                        horizontalArrangement =
+                            if (message.isUser) {
+                                Arrangement.End
+                            } else {
+                                Arrangement.Start
+                            }
                     ) {
+
                         Surface(
                             shape = RoundedCornerShape(
                                 topStart = 16.dp,
                                 topEnd = 16.dp,
-                                bottomStart = if (message.isUser) 16.dp else 4.dp,
-                                bottomEnd = if (message.isUser) 4.dp else 16.dp
+                                bottomStart =
+                                    if (message.isUser) 16.dp else 4.dp,
+                                bottomEnd =
+                                    if (message.isUser) 4.dp else 16.dp
                             ),
-                            color = if (message.isUser) ChatGreen else Color.White,
+                            color =
+                                if (message.isUser) {
+                                    ChatGreen
+                                } else {
+                                    Color.White
+                                },
                             shadowElevation = 1.dp,
-                            modifier = Modifier.fillMaxWidth(0.86f)
+                            modifier = Modifier
+                                .fillMaxWidth(0.86f)
                         ) {
+
                             Text(
                                 text = message.text,
-                                color = if (message.isUser) Color.White else ChatText,
+                                color =
+                                    if (message.isUser) {
+                                        Color.White
+                                    } else {
+                                        ChatText
+                                    },
                                 fontSize = 14.sp,
                                 lineHeight = 21.sp,
                                 modifier = Modifier.padding(14.dp)
@@ -157,14 +249,18 @@ fun ChatbotScreen(
                 if (isLoading) {
                     item {
                         Row(
-                            modifier = Modifier.padding(vertical = 8.dp),
+                            modifier = Modifier.padding(
+                                vertical = 8.dp
+                            ),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
                                 color = ChatGreen,
                                 strokeWidth = 2.dp
                             )
+
                             Text(
                                 "  TradeIQX AI is thinking...",
                                 color = Color.Gray,
@@ -175,42 +271,65 @@ fun ChatbotScreen(
                 }
 
                 item {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
                 }
             }
 
-            // Readable error message
+            // ---------------------------------
+            // ERROR MESSAGE
+            // ---------------------------------
+
             errorMessage?.let { error ->
+
                 Text(
                     text = error,
                     color = Color(0xFFDC2626),
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(
+                        horizontal = 16.dp,
+                        vertical = 4.dp
+                    )
                 )
             }
 
-            // Input and send button
+            // ---------------------------------
+            // MESSAGE INPUT
+            // ---------------------------------
+
             Surface(
                 color = Color.White,
                 shadowElevation = 8.dp
             ) {
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                        .padding(
+                            horizontal = 12.dp,
+                            vertical = 12.dp
+                        ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+
                     Surface(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(24.dp),
                         color = ChatBackground
                     ) {
+
                         BasicTextField(
                             value = input,
-                            onValueChange = { input = it },
+                            onValueChange = {
+                                input = it
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                                .padding(
+                                    horizontal = 16.dp,
+                                    vertical = 14.dp
+                                ),
                             enabled = !isLoading,
                             singleLine = true,
                             textStyle = TextStyle(
@@ -218,6 +337,7 @@ fun ChatbotScreen(
                                 fontSize = 14.sp
                             ),
                             decorationBox = { innerTextField ->
+
                                 Box {
                                     if (input.isEmpty()) {
                                         Text(
@@ -226,40 +346,72 @@ fun ChatbotScreen(
                                             fontSize = 14.sp
                                         )
                                     }
+
                                     innerTextField()
                                 }
                             }
                         )
                     }
 
-                    Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(
+                        modifier = Modifier.size(8.dp)
+                    )
+
+                    // ---------------------------------
+                    // SEND MESSAGE
+                    // ---------------------------------
 
                     Button(
                         onClick = {
+
                             val question = input.trim()
 
-                            if (question.isNotEmpty() && !isLoading) {
-                                messages.add(ChatMessage(question, true))
+                            if (
+                                question.isNotEmpty() &&
+                                !isLoading
+                            ) {
+
+                                messages.add(
+                                    ChatMessage(
+                                        question,
+                                        true
+                                    )
+                                )
+
                                 input = ""
                                 isLoading = true
                                 errorMessage = null
 
                                 scope.launch {
                                     try {
-                                        // Uses AIService.kt and the port 8001 API.
-                                        val answer = AIService.askMentor(question)
-                                        messages.add(ChatMessage(answer, false))
+
+                                        // Uses AIService.kt
+                                        // FastAPI: 10.0.2.2:8002
+                                        val answer =
+                                            AIService.askMentor(question)
+
+                                        messages.add(
+                                            ChatMessage(
+                                                answer,
+                                                false
+                                            )
+                                        )
+
                                     } catch (e: Exception) {
+
                                         errorMessage =
                                             "AI connection failed: " +
-                                                    (e.message ?: "Please try again.")
+                                                    (e.message
+                                                        ?: "Please try again.")
+
                                     } finally {
                                         isLoading = false
                                     }
                                 }
                             }
                         },
-                        enabled = input.isNotBlank() && !isLoading,
+                        enabled =
+                            input.isNotBlank() && !isLoading,
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = ChatGreen
@@ -267,6 +419,7 @@ fun ChatbotScreen(
                         modifier = Modifier.size(48.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
+
                         Text(
                             "↑",
                             color = Color.White,

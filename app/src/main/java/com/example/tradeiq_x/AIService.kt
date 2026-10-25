@@ -1,4 +1,5 @@
 
+
 package com.example.tradeiq_x
 
 import kotlinx.coroutines.Dispatchers
@@ -13,16 +14,18 @@ import java.util.concurrent.TimeUnit
 
 object AIService {
 
-    // Android emulator connects to laptop FastAPI using 10.0.2.2
-    private const val BASE_URL = "http://127.0.0.1:8001"
-
+    // Android Emulator -> FastAPI running on Windows
+    private const val BASE_URL = "http://127.0.0.1:8002"
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    // Send JSON requests to FastAPI
+    // ---------------------------------
+    // SEND JSON REQUESTS TO FASTAPI
+    // ---------------------------------
+
     private suspend fun postJson(
         endpoint: String,
         json: JSONObject
@@ -31,7 +34,7 @@ object AIService {
         val body = json.toString().toRequestBody(
             "application/json; charset=utf-8".toMediaType()
         )
-
+        android.util.Log.d("TRADEIQX_AI", "Calling: $BASE_URL$endpoint")
         val request = Request.Builder()
             .url("$BASE_URL$endpoint")
             .post(body)
@@ -58,15 +61,18 @@ object AIService {
             }
         } catch (e: IOException) {
             throw IOException(
-                "Cannot connect to TradeIQX backend at $BASE_URL. " +
-                        "Check that FastAPI is running on port 8001. " +
+                "Cannot connect to TradeIQX AI backend at $BASE_URL. " +
+                        "Check that FastAPI is running on port 8002. " +
                         "Details: ${e.message}",
                 e
             )
         }
     }
 
-    // Stock analysis explanation
+    // ---------------------------------
+    // STOCK ANALYSIS EXPLANATION
+    // ---------------------------------
+
     suspend fun getStockExplanation(
         symbol: String,
         analysis: AnalysisResult
@@ -87,7 +93,10 @@ object AIService {
         )
     }
 
-    // RAG-based AI Trading Mentor
+    // ---------------------------------
+    // RAG-BASED AI TRADING MENTOR
+    // ---------------------------------
+
     suspend fun askMentor(question: String): String {
 
         require(question.isNotBlank()) {
@@ -109,5 +118,49 @@ object AIService {
         }
 
         return answer
+    }
+
+    // ---------------------------------
+    // AI-POWERED FINANCIAL QUIZ
+    // ---------------------------------
+
+    suspend fun generateQuiz(
+        topic: String = "Stock Market Basics",
+        difficulty: String = "Beginner"
+    ): JSONObject {
+
+        require(topic.isNotBlank()) {
+            "Please select a quiz topic."
+        }
+
+        require(
+            difficulty in listOf(
+                "Beginner",
+                "Intermediate",
+                "Advanced"
+            )
+        ) {
+            "Invalid quiz difficulty."
+        }
+
+        val requestJson = JSONObject().apply {
+            put("topic", topic.trim())
+            put("difficulty", difficulty)
+        }
+
+        val result = postJson(
+            "/api/quiz/generate",
+            requestJson
+        )
+
+        val questions = result.optJSONArray("questions")
+
+        if (questions == null || questions.length() == 0) {
+            throw IOException(
+                "The AI did not generate any quiz questions."
+            )
+        }
+
+        return result
     }
 }
