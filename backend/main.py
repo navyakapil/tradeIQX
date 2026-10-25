@@ -8,7 +8,7 @@ from typing import Dict
 
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
-from models import Base, User
+from models import Base, User, Portfolio, Holding, Trade
 import schemas
 
 from passlib.context import CryptContext
