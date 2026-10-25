@@ -60,11 +60,10 @@ def get_portfolio(db: Session = Depends(get_db)):
     portfolio = db.query(Portfolio).first()
 
     if portfolio is None:
-        return {
-            "cash_balance": 100000.0,
-            "holdings": {},
-            "transactions": [],
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="No portfolio found. Please create a portfolio first."
+        )
 
     user_holdings = db.query(Holding).filter(
         Holding.user_id == portfolio.user_id
@@ -126,12 +125,13 @@ def buy_stock(
 
     # Temporary single-user implementation.
     # We will connect this to the authenticated user next.
+
     portfolio = db.query(Portfolio).first()
 
     if portfolio is None:
         portfolio = Portfolio(
             user_id=1,
-
+            cash_balance=100000.0
         )
         db.add(portfolio)
         db.flush()
@@ -190,7 +190,23 @@ def buy_stock(
     )
 
     db.add(transaction)
-    db.commit()
+
+    try:
+        db.commit()
+        db.refresh(portfolio)
+        db.refresh(holding)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Could not complete the buy transaction"
+        )
+
+    holdings = (
+        db.query(Holding)
+        .filter(Holding.user_id == portfolio.user_id)
+        .all()
+    )
 
     return {
         "message": "Paper trade completed",
@@ -205,9 +221,7 @@ def buy_stock(
             "cash_balance": portfolio.cash_balance,
             "holdings": {
                 item.symbol: item.quantity
-                for item in db.query(Holding)
-                .filter(Holding.user_id == portfolio.user_id)
-                .all()
+                for item in holdings
             }
         }
     }
