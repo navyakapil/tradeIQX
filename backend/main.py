@@ -131,7 +131,7 @@ def buy_stock(
     if portfolio is None:
         portfolio = Portfolio(
             user_id=1,
-            cash_balance=INITIAL_BALANCE
+
         )
         db.add(portfolio)
         db.flush()
@@ -211,45 +211,97 @@ def buy_stock(
             }
         }
     }
-
 @app.post("/sell")
-def sell_stock(trade: TradeRequest):
-    global cash_balance
-
+def sell_stock(
+    trade: TradeRequest,
+    db: Session = Depends(get_db)
+):
     symbol = trade.symbol.strip().upper()
-    current_quantity = holdings.get(symbol, 0)
 
-    if current_quantity < trade.quantity:
+    if not symbol:
         raise HTTPException(
             status_code=400,
-            detail="Insufficient shares to sell",
+            detail="Stock symbol is required"
         )
 
-    total_value = trade.quantity * trade.price
+    if trade.quantity <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Quantity must be greater than zero"
+        )
 
-    cash_balance = round(cash_balance + total_value, 2)
-    remaining = current_quantity - trade.quantity
+    if trade.price <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Price must be greater than zero"
+        )
 
-    if remaining == 0:
-        del holdings[symbol]
-    else:
-        holdings[symbol] = remaining
+    portfolio = db.query(Portfolio).first()
 
-    transaction = {
-        "symbol": symbol,
-        "side": "SELL",
-        "quantity": trade.quantity,
-        "price": trade.price,
-        "total": round(total_value, 2),
-    }
-    transactions.append(transaction)
+    if portfolio is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No portfolio found"
+        )
+
+    holding = (
+        db.query(Holding)
+        .filter(
+            Holding.user_id == portfolio.user_id,
+            Holding.symbol == symbol
+        )
+        .first()
+    )
+
+    if holding is None or holding.quantity < trade.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient shares to sell"
+        )
+
+    total_value = round(trade.quantity * trade.price, 2)
+
+    holding.quantity -= trade.quantity
+
+    if holding.quantity == 0:
+        db.delete(holding)
+
+    portfolio.cash_balance = round(
+        portfolio.cash_balance + total_value,
+        2
+    )
+
+    transaction = Trade(
+        user_id=portfolio.user_id,
+        symbol=symbol,
+        side="SELL",
+        quantity=trade.quantity,
+        price=trade.price,
+        total=total_value
+    )
+
+    db.add(transaction)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Could not complete the sell transaction"
+        )
 
     return {
         "message": "Paper trade completed",
-        "transaction": transaction,
-        "portfolio": get_portfolio(),
+        "transaction": {
+            "symbol": symbol,
+            "side": "SELL",
+            "quantity": trade.quantity,
+            "price": trade.price,
+            "total": total_value
+        },
+        "portfolio": get_portfolio(db)
     }
-
 @app.post("/auth/signup", response_model=schemas.UserResponse, status_code=201)
 def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
         username = user.username.strip()
