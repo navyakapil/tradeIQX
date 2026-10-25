@@ -82,6 +82,10 @@ def get_portfolio(db: Session = Depends(get_db)):
             holding.symbol: holding.quantity
             for holding in user_holdings
         },
+        "average_prices": {
+            holding.symbol: round(holding.average_price, 2)
+            for holding in user_holdings
+        },
         "transactions": [
             {
                 "symbol": trade.symbol,
