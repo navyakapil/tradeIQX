@@ -337,6 +337,35 @@ fun SignUpScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    fun validateSignUpForm(): String? {
+        val trimmedName = name.trim()
+        val trimmedEmail = email.trim()
+
+        if (trimmedName.isEmpty()) return "Please enter your username."
+        if (trimmedName.length < 3) return "Username must be at least 3 characters."
+        if (trimmedName.length > 50) return "Username cannot exceed 50 characters."
+        if (!trimmedName.matches(Regex("^[a-zA-Z0-9_-]+$"))) {
+            return "Username can only contain letters, numbers, underscores, and hyphens."
+        }
+
+        if (trimmedEmail.isEmpty()) return "Please enter your email address."
+        if (!trimmedEmail.contains("@") || !trimmedEmail.contains(".")) {
+            return "Please enter a valid email address."
+        }
+
+        if (password.length < 8) return "Password must be at least 8 characters."
+        if (password.length > 128) return "Password cannot exceed 128 characters."
+        if (!password.any { it.isDigit() }) return "Password must contain at least one number."
+        if (!password.any { it.isLetter() }) return "Password must contain at least one letter."
+
+        if (password != confirmPassword) return "Passwords do not match."
+
+        return null
+    }
 
     Column(
         modifier = Modifier
@@ -358,12 +387,35 @@ fun SignUpScreen(
         Text("Start your paper-trading journey", color = Grey)
         Spacer(Modifier.height(24.dp))
 
+        if (errorMessage != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFFEE2E2)
+                )
+            ) {
+                Text(
+                    text = errorMessage ?: "",
+                    color = ErrorRed,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
+
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it },
-            label = { Text("Full name") },
+            onValueChange = {
+                name = it
+                if (errorMessage != null) errorMessage = null
+            },
+            label = { Text("Username") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = !isLoading,
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -371,10 +423,14 @@ fun SignUpScreen(
 
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = {
+                email = it
+                if (errorMessage != null) errorMessage = null
+            },
             label = { Text("Email address") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = !isLoading,
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -382,10 +438,14 @@ fun SignUpScreen(
 
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
+            onValueChange = {
+                password = it
+                if (errorMessage != null) errorMessage = null
+            },
+            label = { Text("Password (min 8 chars, 1 letter, 1 number)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = !isLoading,
             visualTransformation = PasswordVisualTransformation(),
             shape = RoundedCornerShape(12.dp)
         )
@@ -394,10 +454,14 @@ fun SignUpScreen(
 
         OutlinedTextField(
             value = confirmPassword,
-            onValueChange = { confirmPassword = it },
+            onValueChange = {
+                confirmPassword = it
+                if (errorMessage != null) errorMessage = null
+            },
             label = { Text("Confirm password") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = !isLoading,
             visualTransformation = PasswordVisualTransformation(),
             shape = RoundedCornerShape(12.dp)
         )
@@ -405,7 +469,27 @@ fun SignUpScreen(
         Spacer(Modifier.height(20.dp))
 
         Button(
-            onClick = { onCreateAccount() }, // DEMO MODE: skips backend signup
+            onClick = {
+                if (isLoading) return@Button
+                val validationError = validateSignUpForm()
+                if (validationError != null) {
+                    errorMessage = validationError
+                    return@Button
+                }
+                isLoading = true
+                errorMessage = null
+                coroutineScope.launch {
+                    try {
+                        BackendApi.signup(name.trim(), email.trim(), password)
+                        isLoading = false
+                        onCreateAccount()
+                    } catch (e: Exception) {
+                        isLoading = false
+                        errorMessage = e.message ?: "Registration failed. Please check your details."
+                    }
+                }
+            },
+            enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -414,10 +498,23 @@ fun SignUpScreen(
                 containerColor = Green
             )
         ) {
-            Text("Create Account")
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("Create Account")
+            }
         }
 
-        TextButton(onClick = onLogin) {
+        Spacer(Modifier.height(8.dp))
+
+        TextButton(
+            onClick = onLogin,
+            enabled = !isLoading
+        ) {
             Text(
                 "Already have an account? Login",
                 color = DarkGreen
