@@ -359,6 +359,12 @@ def get_portfolio(
 # BUY STOCK
 # --------------------------------------------------
 
+KNOWN_SYMBOLS = {
+    "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
+    "ITC", "SBIN", "WIPRO", "TATAMOTORS", "BHARTIARTL",
+    "KOTAKBANK", "LT"
+}
+
 @app.post("/buy")
 def buy_stock(
     trade: TradeRequest,
@@ -383,6 +389,18 @@ def buy_stock(
         raise HTTPException(
             status_code=400,
             detail="Price must be greater than zero"
+        )
+
+    if symbol not in KNOWN_SYMBOLS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown stock symbol: {symbol}"
+        )
+
+    if symbol not in KNOWN_SYMBOLS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown stock symbol: {symbol}"
         )
 
     eff_user_id, account, portfolio = get_or_create_user_account(db, user_id)
