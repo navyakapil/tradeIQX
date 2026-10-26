@@ -18,3 +18,11 @@ backend/venv/
 __pycache__/
 *.py[cod]
 *.db
+
+# Embedding and RAG Caches
+*embedding*cache*
+*.embeddings.cache*
+*.npy
+rag_cache/
+.rag_cache/
+rag/*.cache

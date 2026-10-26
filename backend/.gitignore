@@ -17,3 +17,11 @@ __pycache__/
 # Local databases
 *.db
 *.sqlite3
+
+# Embedding and RAG Caches
+*embedding*cache*
+*.embeddings.cache*
+*.npy
+rag_cache/
+.rag_cache/
+rag/*.cache
