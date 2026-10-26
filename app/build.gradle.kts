@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -27,9 +30,8 @@ android {
 
         val localPropsFile = rootProject.file("local.properties")
         if (localPropsFile.exists()) {
-            val localProps = java.util.Properties().apply {
-                localPropsFile.inputStream().use { load(it) }
-            }
+            val localProps = Properties()
+            FileInputStream(localPropsFile).use { localProps.load(it) }
             val fromLocal = localProps.getProperty("tradeiqx.backend.url")
                 ?: localProps.getProperty("TRADEIQX_BACKEND_URL")
             if (!fromLocal.isNullOrBlank()) return@run fromLocal
