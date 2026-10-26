@@ -1,5 +1,8 @@
 package com.example.tradeiq_x
 
+import kotlinx.coroutines.delay
+import java.io.IOException
+
 /**
  * Live market repository implementation backed by the TradeIQX FastAPI market service
  * and upstream Groww market data API.
@@ -29,6 +32,48 @@ class LiveMarketRepository : MarketRepository {
     )
 
     /**
+     * Executes an operation with bounded retry and exponential backoff for transient failures.
+     * Rejects retrying for non-transient 4xx HTTP responses, rate limit status codes (429),
+     * or symbol validation exceptions.
+     */
+    private suspend fun <T> retryTransient(
+        maxAttempts: Int = 3,
+        initialDelayMs: Long = 250L,
+        block: suspend () -> T
+    ): T {
+        var currentDelay = initialDelayMs
+        var lastException: Exception? = null
+
+        for (attempt in 1..maxAttempts) {
+            try {
+                return block()
+            } catch (exception: Exception) {
+                lastException = exception
+                val message = exception.message.orEmpty()
+
+                // Check for non-retryable conditions: 4xx errors, rate limits, or validation failures
+                val isNonRetryable = exception is IllegalArgumentException ||
+                        message.contains("400") ||
+                        message.contains("401") ||
+                        message.contains("403") ||
+                        message.contains("404") ||
+                        message.contains("422") ||
+                        message.contains("429") ||
+                        message.contains("rate limit", ignoreCase = true) ||
+                        message.contains("Invalid stock symbol", ignoreCase = true)
+
+                if (isNonRetryable || attempt == maxAttempts) {
+                    throw exception
+                }
+
+                delay(currentDelay)
+                currentDelay *= 2
+            }
+        }
+        throw lastException ?: IOException("Request failed after $maxAttempts attempts")
+    }
+
+    /**
      * Fetches live quotes for all default watchlist symbols concurrently.
      * Skips symbols that fail to return valid quotes.
      */
@@ -40,6 +85,7 @@ class LiveMarketRepository : MarketRepository {
 
     /**
      * Fetches the live quote for a given symbol from the backend API.
+     * Retries transient network failures with exponential backoff up to 3 times.
      *
      * @param symbol Ticker symbol to query (e.g. "RELIANCE", "TCS.NS", "NSE_INFY").
      * @return [StockQuote] with latest price and timestamp, or null on error.
@@ -52,7 +98,9 @@ class LiveMarketRepository : MarketRepository {
         }
 
         return try {
-            val response = BackendApi.getLiveQuote(normalizedSymbol)
+            val response = retryTransient {
+                BackendApi.getLiveQuote(normalizedSymbol)
+            }
             val price = response.optDouble("price", 0.0)
 
             if (!price.isFinite() || price <= 0.0) {
