@@ -5,3 +5,7 @@ pydantic
 passlib[bcrypt]
 httpx
 bcrypt==4.0.1
+growwapi==1.5.0
+python-dotenv==1.2.4
+email-validator==2.3.0
+requests==2.34.2
