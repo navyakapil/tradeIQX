@@ -12,7 +12,7 @@ from models import Account
 from prices import get_stock_info
 from schemas import QuoteResponse, OrderCreate, OrderResponse
 from deps import get_current_account
-from services import execute_buy_order
+from services import execute_buy_order, execute_sell_order
 
 # Initialize database schema on startup
 Base.metadata.create_all(bind=engine)
@@ -60,7 +60,7 @@ def place_order(
     account: Account = Depends(get_current_account),
     db: Session = Depends(get_db),
 ):
-    """Places an order (BUY) with atomic execution and server price authority."""
+    """Places an order (BUY or SELL) with atomic execution and server price authority."""
     if payload.side == "BUY":
         return execute_buy_order(
             db=db,
@@ -69,7 +69,15 @@ def place_order(
             quantity=payload.quantity,
             idempotency_key=payload.idempotency_key,
         )
+    elif payload.side == "SELL":
+        return execute_sell_order(
+            db=db,
+            account=account,
+            symbol=payload.symbol,
+            quantity=payload.quantity,
+            idempotency_key=payload.idempotency_key,
+        )
     raise HTTPException(
         status_code=400,
-        detail=f"Order side '{payload.side}' not yet supported in this endpoint",
+        detail=f"Order side '{payload.side}' is invalid. Must be BUY or SELL.",
     )
