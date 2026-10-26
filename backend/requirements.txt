@@ -1,7 +1,13 @@
-
 fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
 passlib[bcrypt]
 httpx
+python-dotenv
+sentence-transformers
+scikit-learn
+numpy
+google-genai
+openai
+requests
