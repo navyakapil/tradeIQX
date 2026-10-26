@@ -35,19 +35,25 @@ fun StockDetailsScreen(
     var currentQuote by remember { mutableStateOf<StockQuote?>(null) }
     var candles by remember { mutableStateOf<List<PriceCandle>>(emptyList()) }
     var isMarketLoading by remember { mutableStateOf(false) }
+    var chartError by remember { mutableStateOf<String?>(null) }
+    var reloadTrigger by remember { mutableStateOf(0) }
 
     // Automatically cancels previous in-flight coroutine if stock or range changes
-    LaunchedEffect(stock, selectedRange) {
+    LaunchedEffect(stock, selectedRange, reloadTrigger) {
         isMarketLoading = true
+        chartError = null
         try {
             val fetchedQuote = MarketDataManager.repository.getQuote(stock)
             val fetchedCandles = MarketDataManager.repository.getHistory(stock, selectedRange)
             currentQuote = fetchedQuote
             candles = fetchedCandles
+            if (fetchedCandles.isEmpty()) {
+                chartError = "Historical chart data unavailable for $stock"
+            }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            // Retain existing state on transient failure
+            chartError = "Failed to load chart data. Please try again."
         } finally {
             isMarketLoading = false
         }
@@ -164,31 +170,78 @@ fun StockDetailsScreen(
                     fontSize = 14.sp
                 )
 
-                // Decorative chart bars; not historical market data.
-                val bars = listOf(
-                    12, 18, 14, 25, 21, 32, 27, 38, 31, 45, 39, 53
-                )
-
-                Row(
+                // Chart container with loading, empty/error, and candle visualizer states
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(100.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    verticalAlignment = Alignment.Bottom
+                        .height(110.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    bars.forEachIndexed { index, height ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(height.dp)
-                                .background(
-                                    MarketColors.darkChangeColor(sampleChange >= 0),
-                                    RoundedCornerShape(
-                                        topStart = 3.dp,
-                                        topEnd = 3.dp
-                                    )
+                    when {
+                        isMarketLoading -> {
+                            CircularProgressIndicator(
+                                color = MarketColors.DarkGainGreen,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        chartError != null || candles.isEmpty() -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = chartError ?: "Chart data unavailable for $stock",
+                                    color = DetailsMuted,
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
                                 )
-                        )
+                                TextButton(
+                                    onClick = { reloadTrigger++ },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MarketColors.DarkGainGreen
+                                    )
+                                ) {
+                                    Text(
+                                        "Retry",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        else -> {
+                            val minPrice = candles.minOfOrNull { it.low } ?: 0.0
+                            val maxPrice = candles.maxOfOrNull { it.high } ?: 1.0
+                            val priceRange = (maxPrice - minPrice).takeIf { it > 0.0 } ?: 1.0
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                candles.forEach { candle ->
+                                    val barHeight = (((candle.close - minPrice) / priceRange) * 75 + 15)
+                                        .coerceIn(10.0, 95.0)
+                                    val isBarGain = candle.close >= candle.open
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(barHeight.dp)
+                                            .background(
+                                                MarketColors.darkChangeColor(isBarGain),
+                                                RoundedCornerShape(
+                                                    topStart = 3.dp,
+                                                    topEnd = 3.dp
+                                                )
+                                            )
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
