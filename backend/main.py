@@ -651,21 +651,39 @@ logger = logging.getLogger(__name__)
 # ---------------------------------
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1)
+    question: Optional[str] = Field(None, max_length=500)
+    message: Optional[str] = Field(None, max_length=500)
 
 
-@app.post("/api/chat")
+class ChatResponse(BaseModel):
+    answer: str
+    sources: list[str] = []
+    reply: Optional[str] = None
+
+
+@app.post("/api/chat", response_model=ChatResponse)
 def chat(data: ChatRequest):
-    question = data.message.strip()
+    question = (data.question or data.message or "").strip()
 
     if not question:
         raise HTTPException(
-            status_code=400,
-            detail="Please enter a trading question."
+            status_code=422,
+            detail="Question cannot be empty."
+        )
+
+    if len(question) > 500:
+        raise HTTPException(
+            status_code=422,
+            detail="Question must not exceed 500 characters."
         )
 
     try:
-        return answer_question(question)
+        result = answer_question(question)
+        return ChatResponse(
+            answer=result["answer"],
+            sources=result.get("sources", []),
+            reply=result.get("reply", result["answer"])
+        )
 
     except FileNotFoundError:
         logger.exception("RAG knowledge base missing")
