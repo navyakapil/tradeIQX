@@ -9,7 +9,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 try:
