@@ -27,6 +27,8 @@ private val TxGreen = Color(0xFF32D49A)
 private val TxRed = Color(0xFFFF5364)
 private val TxText = Color(0xFFF8FAFC)
 private val TxMuted = Color(0xFF9FB0C0)
+private val OfflineBannerBg = Color(0xFF2A1F0D)
+private val OfflineText = Color(0xFFFFB74D)
 
 private fun txMoney(value: Double): String =
     "₹" + NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
@@ -70,18 +72,59 @@ fun TransactionsScreen(onBackClick: () -> Unit = {}) {
             Text("‹ Back", color = TxText)
         }
 
-        Text(
-            "Transactions",
-            color = TxText,
-            fontSize = 27.sp,
-            fontWeight = FontWeight.Bold
-        )
+        // Offline Banner
+        if (TradingStore.isOffline.value) {
+            Surface(
+                color = OfflineBannerBg,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("⚡", fontSize = 12.sp)
+                    Text(
+                        "offline — showing last saved data",
+                        color = OfflineText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
 
-        Text(
-            "Your executed paper trades",
-            color = TxMuted,
-            fontSize = 13.sp
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "Transactions",
+                    color = TxText,
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    "Your executed paper trades",
+                    color = TxMuted,
+                    fontSize = 13.sp
+                )
+            }
+
+            if (TradingStore.isLoading.value) {
+                CircularProgressIndicator(
+                    color = TxGreen,
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
 
