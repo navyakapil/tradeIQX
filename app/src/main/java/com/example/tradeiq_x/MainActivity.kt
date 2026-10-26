@@ -19,12 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 private val Green = Color(0xFF16A34A)
 private val DarkGreen = Color(0xFF15803D)
 private val Dark = Color(0xFF0F172A)
 private val Background = Color(0xFFF5F7FB)
 private val Grey = Color(0xFF64748B)
+private val ErrorRed = Color(0xFFDC2626)
 
 enum class AppScreen {
     WELCOME, LOGIN, SIGNUP, HOME, MARKET_WATCH,
@@ -186,6 +188,19 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    fun validateForm(): String? {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isEmpty()) return "Please enter your email address."
+        if (!trimmedEmail.contains("@") || !trimmedEmail.contains(".")) {
+            return "Please enter a valid email address."
+        }
+        if (password.isEmpty()) return "Please enter your password."
+        return null
+    }
 
     Column(
         modifier = Modifier
@@ -208,12 +223,35 @@ fun LoginScreen(
         Text("Log in to continue paper trading", color = Grey)
         Spacer(Modifier.height(28.dp))
 
+        if (errorMessage != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFFEE2E2)
+                )
+            ) {
+                Text(
+                    text = errorMessage ?: "",
+                    color = ErrorRed,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
+
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = {
+                email = it
+                if (errorMessage != null) errorMessage = null
+            },
             label = { Text("Email address") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = !isLoading,
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -221,10 +259,14 @@ fun LoginScreen(
 
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = {
+                password = it
+                if (errorMessage != null) errorMessage = null
+            },
             label = { Text("Password") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = !isLoading,
             visualTransformation = PasswordVisualTransformation(),
             shape = RoundedCornerShape(12.dp)
         )
@@ -232,7 +274,27 @@ fun LoginScreen(
         Spacer(Modifier.height(24.dp))
 
         Button(
-            onClick = { onLogin() }, // DEMO MODE: skips backend login
+            onClick = {
+                if (isLoading) return@Button
+                val validationError = validateForm()
+                if (validationError != null) {
+                    errorMessage = validationError
+                    return@Button
+                }
+                isLoading = true
+                errorMessage = null
+                coroutineScope.launch {
+                    try {
+                        BackendApi.login(email.trim(), password)
+                        isLoading = false
+                        onLogin()
+                    } catch (e: Exception) {
+                        isLoading = false
+                        errorMessage = e.message ?: "Authentication failed. Please verify credentials."
+                    }
+                }
+            },
+            enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -241,10 +303,23 @@ fun LoginScreen(
                 containerColor = Green
             )
         ) {
-            Text("Login")
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("Login")
+            }
         }
 
-        TextButton(onClick = onSignUp) {
+        Spacer(Modifier.height(8.dp))
+
+        TextButton(
+            onClick = onSignUp,
+            enabled = !isLoading
+        ) {
             Text(
                 "New here? Create an account",
                 color = DarkGreen
