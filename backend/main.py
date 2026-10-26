@@ -1,5 +1,7 @@
 from typing import Dict, Optional
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -15,6 +17,14 @@ TradeRequest = schemas.TradeRequest
 
 app = FastAPI(title="TradeIQX API")
 Base.metadata.create_all(bind=engine)
+
+
+@app.exception_handler(SQLAlchemyError)
+def sqlalchemy_exception_handler(request, exc: SQLAlchemyError):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "A database error occurred. Please try again later."}
+    )
 
 pwd_context = CryptContext(
     schemes=["bcrypt_sha256"],
