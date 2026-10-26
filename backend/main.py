@@ -1,4 +1,4 @@
-﻿from typing import Dict, Optional
+from typing import Dict, Optional
 import math
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
@@ -25,19 +25,36 @@ TradeRequest = schemas.TradeRequest
 
 from sqlalchemy import text
 
+import os
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="TradeIQX API")
+
+ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "*")
+ALLOWED_ORIGINS = [orig.strip() for orig in ALLOWED_ORIGINS_RAW.split(",") if orig.strip()]
+if not ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 Base.metadata.create_all(bind=engine)
 
 # Auto-migrate SQLite schema columns for existing databases
-try:
-    with engine.connect() as _conn:
-        _result = _conn.execute(text("PRAGMA table_info(users)"))
-        _cols = [row[1] for row in _result.fetchall()]
-        if _cols and "created_at" not in _cols:
-            _conn.execute(text("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
-            _conn.commit()
-except Exception:
-    pass
+if getattr(engine.dialect, "name", "") == "sqlite":
+    try:
+        with engine.connect() as _conn:
+            _result = _conn.execute(text("PRAGMA table_info(users)"))
+            _cols = [row[1] for row in _result.fetchall()]
+            if _cols and "created_at" not in _cols:
+                _conn.execute(text("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
+                _conn.commit()
+    except Exception:
+        pass
 
 
 @app.exception_handler(SQLAlchemyError)
@@ -116,17 +133,17 @@ def home():
 
 
 @app.get("/health")
-def health_check(db: Session = Depends(get_db)):
-    db_status = "healthy"
+def health_check():
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+def readiness_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "healthy"}
     except Exception:
-        db_status = "unhealthy"
-
-    return {
-        "status": "healthy" if db_status == "healthy" else "degraded",
-        "database": db_status
-    }
+        raise HTTPException(status_code=503, detail="Database not ready")
 
 
 @app.get("/market/quote/{symbol}", response_model=schemas.MarketQuoteResponse)
@@ -553,7 +570,7 @@ def sell_stock(
             "price": trade.price,
             "total": total_value
         },
-        "portfolio": get_portfolio(db)
+        "portfolio": get_portfolio(db, user_id=portfolio.user_id)
     }
 @app.post("/auth/signup", response_model=schemas.UserResponse, status_code=201)
 def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
@@ -655,6 +672,7 @@ def get_current_user_profile(
 
 # AI Mentor imports
 import logging
+import requests
 from rag_service import answer_question, generate_quiz
 
 logger = logging.getLogger(__name__)
@@ -699,87 +717,56 @@ def chat(data: ChatRequest):
 # AI QUIZ GENERATION
 # ---------------------------------
 
+VALID_QUIZ_DIFFICULTIES = ("Beginner", "Intermediate", "Advanced")
+
+
 class QuizGenerateRequest(BaseModel):
     topic: str = "Stock Market Basics"
     difficulty: str = "Beginner"
 
 
-FALLBACK_QUIZ_QUESTIONS = [
-    {
-        "question": "What does owning a share of stock represent?",
-        "options": [
-            "A loan made to the company",
-            "Fractional ownership in the corporation",
-            "A guaranteed dividend payment",
-            "A contract to purchase company products"
-        ],
-        "correct_index": 1,
-        "explanation": "A stock represents fractional ownership (equity) in a corporation."
-    },
-    {
-        "question": "What is the primary role of a stock exchange like the NSE?",
-        "options": [
-            "Setting daily stock price targets",
-            "Providing a regulated marketplace for buyers and sellers",
-            "Lending capital directly to private companies",
-            "Insuring investors against market losses"
-        ],
-        "correct_index": 1,
-        "explanation": "Stock exchanges provide a secure, transparent, and regulated marketplace to facilitate trading between buyers and sellers."
-    },
-    {
-        "question": "What does a 'Bull Market' signify in financial markets?",
-        "options": [
-            "A prolonged period of declining stock prices",
-            "A market where only institutional funds trade",
-            "A period of rising asset prices and investor confidence",
-            "A market closed due to volatility limits"
-        ],
-        "correct_index": 2,
-        "explanation": "A bull market refers to an economic condition characterized by rising stock prices and optimistic investor sentiment."
-    },
-    {
-        "question": "What is the purpose of diversification in an investment portfolio?",
-        "options": [
-            "Maximizing return by investing all funds in one stock",
-            "Reducing unsystematic risk by spreading capital across multiple assets",
-            "Eliminating all market risk completely",
-            "Avoiding capital gains taxes"
-        ],
-        "correct_index": 1,
-        "explanation": "Diversification spreads investments across various industries or asset classes to reduce company-specific risk."
-    },
-    {
-        "question": "What does a stop-loss order do?",
-        "options": [
-            "Guarantees that a stock will be sold at a profit",
-            "Automatically triggers a sell order when the price drops to a set level",
-            "Prevents a broker from charging transaction fees",
-            "Freezes trading on a stock for 24 hours"
-        ],
-        "correct_index": 1,
-        "explanation": "A stop-loss order is designed to limit an investor's loss on a position by executing a market or limit order once a designated trigger price is reached."
-    }
-]
-
-
 @app.post("/api/quiz/generate")
 def quiz_generate(data: QuizGenerateRequest):
-    topic = data.topic.strip() if data.topic else "Stock Market Basics"
+    topic = data.topic.strip() if data.topic else ""
+    if not topic:
+        raise HTTPException(
+            status_code=400,
+            detail="Quiz topic is required."
+        )
+
     difficulty = data.difficulty.strip() if data.difficulty else "Beginner"
+    if difficulty not in VALID_QUIZ_DIFFICULTIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid difficulty level. Allowed values: {', '.join(VALID_QUIZ_DIFFICULTIES)}"
+        )
 
     try:
         return generate_quiz(topic=topic, difficulty=difficulty)
+    except ValueError as val_err:
+        logger.warning("Quiz parameter validation failed: %s", val_err)
+        raise HTTPException(
+            status_code=400,
+            detail=str(val_err)
+        )
+    except FileNotFoundError as fnf_err:
+        logger.exception("RAG financial knowledge base missing: %s", fnf_err)
+        raise HTTPException(
+            status_code=503,
+            detail="Financial knowledge base not found."
+        )
+    except (requests.Timeout, requests.ConnectionError, requests.RequestException) as req_err:
+        logger.exception("AI model service connection failed during quiz generation: %s", req_err)
+        raise HTTPException(
+            status_code=503,
+            detail="AI Quiz generator is temporarily unavailable."
+        )
     except Exception as exc:
-        logger.warning("AI Quiz RAG generation failed, serving educational fallback: %s", exc)
-        return {
-            "topic": topic,
-            "difficulty": difficulty,
-            "questions": FALLBACK_QUIZ_QUESTIONS,
-            "total_questions": len(FALLBACK_QUIZ_QUESTIONS),
-            "sources": ["TradeIQX Educational Knowledge Base"],
-            "mode": "fallback_quiz"
-        }
+        logger.exception("Unexpected error during AI quiz generation: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate AI quiz."
+        ) from exc
 
 
 # ---------------------------------

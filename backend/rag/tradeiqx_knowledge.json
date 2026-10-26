@@ -1,0 +1,398 @@
+[
+    {
+        "id": "TA001",
+        "topic": "RSI",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "RSI",
+            "Relative Strength Index",
+            "momentum",
+            "overbought",
+            "oversold"
+        ],
+        "content": "RSI, or Relative Strength Index, is a momentum indicator commonly used to evaluate the strength and speed of recent price movements. It ranges from 0 to 100. Traders often use RSI levels such as 70 and 30 as potential signals of overbought and oversold conditions, although these levels should not be treated as guaranteed signals."
+    },
+    {
+        "id": "TA002",
+        "topic": "Moving Average",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "moving average",
+            "SMA",
+            "EMA",
+            "trend",
+            "average price"
+        ],
+        "content": "A moving average calculates the average price of an asset over a specified number of periods. Traders commonly use moving averages to identify trends and smooth short-term price fluctuations."
+    },
+    {
+        "id": "TA003",
+        "topic": "Support",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "support",
+            "price level",
+            "buyers",
+            "technical analysis"
+        ],
+        "content": "Support is a price level where buying interest may be strong enough to slow or stop a decline in price. Support is not guaranteed to hold, and a price can move below it."
+    },
+    {
+        "id": "TA004",
+        "topic": "Resistance",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "resistance",
+            "price level",
+            "sellers",
+            "technical analysis"
+        ],
+        "content": "Resistance is a price level where selling pressure may be strong enough to slow or stop a price increase. Resistance is not guaranteed to hold, and a price can move above it."
+    },
+    {
+        "id": "RM001",
+        "topic": "Stop Loss",
+        "category": "Risk Management",
+        "difficulty": "Beginner",
+        "keywords": [
+            "stop loss",
+            "risk",
+            "loss",
+            "exit",
+            "risk management"
+        ],
+        "content": "A stop-loss is an order or predefined exit level intended to limit potential losses on a trade. It does not guarantee a specific execution price, especially during rapid market movements or gaps."
+    },
+    {
+        "id": "TA005",
+        "topic": "MACD",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "MACD",
+            "momentum",
+            "trend",
+            "moving average"
+        ],
+        "content": "MACD, or Moving Average Convergence Divergence, is a technical indicator commonly used to study momentum and trends by comparing moving averages of an asset's price."
+    },
+    {
+        "id": "TA006",
+        "topic": "Candlestick",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "candlestick",
+            "open",
+            "close",
+            "high",
+            "low",
+            "price"
+        ],
+        "content": "A candlestick is a chart representation showing an asset's open, high, low, and closing prices for a particular period."
+    },
+    {
+        "id": "TA007",
+        "topic": "Volume",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "volume",
+            "trading volume",
+            "buying",
+            "selling"
+        ],
+        "content": "Trading volume represents the number of shares or contracts traded during a particular period. Traders may examine volume alongside price movements to understand market activity."
+    },
+    {
+        "id": "TA008",
+        "topic": "Trend",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "trend",
+            "uptrend",
+            "downtrend",
+            "price direction"
+        ],
+        "content": "A trend describes the general direction in which an asset's price is moving. Common classifications include uptrends, downtrends, and sideways movements."
+    },
+    {
+        "id": "FA001",
+        "topic": "P/E Ratio",
+        "category": "Fundamental Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "P/E",
+            "price earnings",
+            "valuation",
+            "earnings"
+        ],
+        "content": "The price-to-earnings ratio compares a company's share price with its earnings per share. It is commonly used as one measure when evaluating a company's valuation."
+    },
+    {
+        "id": "FA002",
+        "topic": "EPS",
+        "category": "Fundamental Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "EPS",
+            "earnings per share",
+            "profit",
+            "earnings"
+        ],
+        "content": "Earnings per share, or EPS, represents a company's profit allocated to each outstanding share. It is commonly used when analyzing a company's financial performance."
+    },
+    {
+        "id": "RM002",
+        "topic": "Position Sizing",
+        "category": "Risk Management",
+        "difficulty": "Beginner",
+        "keywords": [
+            "position sizing",
+            "risk",
+            "trade size",
+            "capital"
+        ],
+        "content": "Position sizing is the process of determining how much capital or how many units to allocate to a trade based on factors such as account size and acceptable risk."
+    },
+    {
+        "id": "RM003",
+        "topic": "Diversification",
+        "category": "Risk Management",
+        "difficulty": "Beginner",
+        "keywords": [
+            "diversification",
+            "portfolio",
+            "risk",
+            "assets"
+        ],
+        "content": "Diversification involves spreading investments across different assets or securities. It can help reduce the impact that poor performance of one investment has on a portfolio."
+    },
+    {
+        "id": "TP001",
+        "topic": "FOMO",
+        "category": "Trading Psychology",
+        "difficulty": "Beginner",
+        "keywords": [
+            "FOMO",
+            "fear of missing out",
+            "emotion",
+            "trading psychology"
+        ],
+        "content": "FOMO, or fear of missing out, can cause traders to enter trades impulsively because they are worried about missing a price movement. Recognizing this emotion can help encourage more disciplined decision-making."
+    },
+    {
+        "id": "TP002",
+        "topic": "Overtrading",
+        "category": "Trading Psychology",
+        "difficulty": "Beginner",
+        "keywords": [
+            "overtrading",
+            "too many trades",
+            "emotion",
+            "discipline"
+        ],
+        "content": "Overtrading occurs when a trader makes more trades than their strategy or risk plan requires. It can increase transaction costs and expose the trader to unnecessary risk."
+    },
+    {
+        "id": "SB001",
+        "topic": "What is a Stock",
+        "category": "Stock Market Basics",
+        "difficulty": "Beginner",
+        "keywords": [
+            "stock",
+            "share",
+            "ownership",
+            "company"
+        ],
+        "content": "A stock represents a unit of ownership in a company. When a person owns shares of a company, they have an ownership interest in that business."
+    },
+    {
+        "id": "SB002",
+        "topic": "IPO",
+        "category": "Stock Market Basics",
+        "difficulty": "Beginner",
+        "keywords": [
+            "IPO",
+            "initial public offering",
+            "company",
+            "public"
+        ],
+        "content": "An IPO, or Initial Public Offering, is the process through which a private company offers its shares to the public for the first time."
+    },
+    {
+        "id": "SB003",
+        "topic": "Market Capitalization",
+        "category": "Stock Market Basics",
+        "difficulty": "Beginner",
+        "keywords": [
+            "market cap",
+            "market capitalization",
+            "company size",
+            "valuation"
+        ],
+        "content": "Market capitalization is the total market value of a company's outstanding shares. It is commonly calculated as share price multiplied by shares outstanding."
+    },
+    {
+        "id": "SB004",
+        "topic": "Dividend",
+        "category": "Stock Market Basics",
+        "difficulty": "Beginner",
+        "keywords": [
+            "dividend",
+            "income",
+            "shareholder",
+            "profit"
+        ],
+        "content": "A dividend is a distribution of part of a company's profits to eligible shareholders. Companies are not required to pay dividends and may choose to retain profits instead."
+    },
+    {
+        "id": "FA003",
+        "topic": "Revenue",
+        "category": "Fundamental Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "revenue",
+            "sales",
+            "income",
+            "business"
+        ],
+        "content": "Revenue is the amount of money a company generates from its business activities before expenses are deducted."
+    },
+    {
+        "id": "FA004",
+        "topic": "Net Profit",
+        "category": "Fundamental Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "net profit",
+            "profit",
+            "earnings",
+            "income"
+        ],
+        "content": "Net profit is the amount remaining after a company subtracts its expenses, taxes, interest, and other costs from its revenue."
+    },
+    {
+        "id": "FA005",
+        "topic": "Debt-to-Equity Ratio",
+        "category": "Fundamental Analysis",
+        "difficulty": "Intermediate",
+        "keywords": [
+            "debt to equity",
+            "D/E",
+            "debt",
+            "equity",
+            "leverage"
+        ],
+        "content": "The debt-to-equity ratio compares a company's total debt with its shareholders' equity. It is commonly used to assess how much a company relies on debt financing."
+    },
+    {
+        "id": "FA006",
+        "topic": "ROE",
+        "category": "Fundamental Analysis",
+        "difficulty": "Intermediate",
+        "keywords": [
+            "ROE",
+            "return on equity",
+            "profit",
+            "equity"
+        ],
+        "content": "Return on equity, or ROE, measures how effectively a company generates profit from shareholders' equity. It is one metric investors may consider when evaluating financial performance."
+    },
+    {
+        "id": "TA009",
+        "topic": "EMA",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "EMA",
+            "exponential moving average",
+            "moving average",
+            "trend"
+        ],
+        "content": "An exponential moving average, or EMA, is a moving average that gives greater weight to more recent prices than older prices."
+    },
+    {
+        "id": "TA010",
+        "topic": "SMA",
+        "category": "Technical Analysis",
+        "difficulty": "Beginner",
+        "keywords": [
+            "SMA",
+            "simple moving average",
+            "moving average",
+            "price"
+        ],
+        "content": "A simple moving average, or SMA, calculates the arithmetic average of prices over a selected number of periods."
+    },
+    {
+        "id": "TA011",
+        "topic": "Breakout",
+        "category": "Technical Analysis",
+        "difficulty": "Intermediate",
+        "keywords": [
+            "breakout",
+            "support",
+            "resistance",
+            "price movement"
+        ],
+        "content": "A breakout occurs when price moves beyond a level such as support or resistance. Traders may study breakouts for potential changes in price behavior, but breakouts can also fail."
+    },
+    {
+        "id": "RM004",
+        "topic": "Risk Reward Ratio",
+        "category": "Risk Management",
+        "difficulty": "Beginner",
+        "keywords": [
+            "risk reward",
+            "risk/reward",
+            "profit target",
+            "stop loss"
+        ],
+        "content": "The risk-reward ratio compares the potential loss of a trade with its potential gain. Traders may use it when evaluating whether a trade fits their risk plan."
+    },
+    {
+        "id": "RM005",
+        "topic": "Portfolio Risk",
+        "category": "Risk Management",
+        "difficulty": "Intermediate",
+        "keywords": [
+            "portfolio risk",
+            "risk",
+            "portfolio",
+            "volatility"
+        ],
+        "content": "Portfolio risk refers to the possibility that the investments in a portfolio may lose value or perform differently than expected. Diversification and position sizing are commonly used to manage portfolio risk."
+    },
+    {
+        "id": "TP003",
+        "topic": "Revenge Trading",
+        "category": "Trading Psychology",
+        "difficulty": "Beginner",
+        "keywords": [
+            "revenge trading",
+            "loss",
+            "emotion",
+            "psychology"
+        ],
+        "content": "Revenge trading occurs when a trader makes impulsive trades after a loss in an attempt to recover money quickly. It can lead to decisions that ignore the trader's original strategy or risk limits."
+    },
+    {
+        "id": "TP004",
+        "topic": "Trading Discipline",
+        "category": "Trading Psychology",
+        "difficulty": "Beginner",
+        "keywords": [
+            "discipline",
+            "trading plan",
+            "psychology",
+            "consistency"
+        ],
+        "content": "Trading discipline means consistently following a predefined trading plan, including entry rules, exit rules, and risk limits, rather than making decisions purely from emotions."
+    }
+]

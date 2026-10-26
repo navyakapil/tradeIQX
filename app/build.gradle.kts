@@ -1,3 +1,5 @@
+import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
     alias(libs.plugins.android.application)
@@ -22,9 +24,29 @@ android {
             "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val configuredBackendUrl: String = run {
+        val prop = project.findProperty("TRADEIQX_BACKEND_URL") as? String
+        if (!prop.isNullOrBlank()) return@run prop
+
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            val localProps = Properties()
+            FileInputStream(localPropsFile).use { localProps.load(it) }
+            val fromLocal = localProps.getProperty("tradeiqx.backend.url")
+                ?: localProps.getProperty("TRADEIQX_BACKEND_URL")
+            if (!fromLocal.isNullOrBlank()) return@run fromLocal
+        }
+        ""
+    }
+
     buildTypes {
+        debug {
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$configuredBackendUrl\"")
+        }
         release {
             isMinifyEnabled = false
+            val releaseUrl = configuredBackendUrl.ifBlank { "https://tradeiqx-backend-service.a.run.app" }
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$releaseUrl\"")
         }
     }
 
@@ -35,6 +57,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
