@@ -515,18 +515,12 @@ def sell_stock(
             detail="Price must be greater than zero"
         )
 
-    portfolio = resolve_user_portfolio(db, user_id)
-
-    if portfolio is None:
-        raise HTTPException(
-            status_code=400,
-            detail="No portfolio found"
-        )
+    eff_user_id, account, portfolio = get_or_create_user_account(db, user_id)
 
     holding = (
         db.query(Holding)
         .filter(
-            Holding.user_id == portfolio.user_id,
+            Holding.user_id == eff_user_id,
             Holding.symbol == symbol
         )
         .first()
@@ -538,10 +532,27 @@ def sell_stock(
             detail="Insufficient shares to sell"
         )
 
+    # Calculate realized P&L based on weighted average buy price
+    avg_cost = holding.average_price
+    realized_pnl = round(trade.quantity * (trade.price - avg_cost), 2)
     total_value = round(trade.quantity * trade.price, 2)
 
-    holding.quantity -= trade.quantity
+    # Record order
+    client_oid = getattr(trade, "client_order_id", None)
+    order = Order(
+        user_id=eff_user_id,
+        client_order_id=client_oid,
+        side="SELL",
+        symbol=symbol,
+        quantity=trade.quantity,
+        price=trade.price,
+        status="EXECUTED"
+    )
+    db.add(order)
+    db.flush()
 
+    holding.quantity -= trade.quantity
+    remaining_qty = holding.quantity
     if holding.quantity == 0:
         db.delete(holding)
 
@@ -549,16 +560,18 @@ def sell_stock(
         portfolio.cash_balance + total_value,
         2
     )
+    account.cash = portfolio.cash_balance
 
     transaction = Trade(
-        user_id=portfolio.user_id,
+        user_id=eff_user_id,
+        order_id=order.id,
         symbol=symbol,
         side="SELL",
         quantity=trade.quantity,
         price=trade.price,
-        total=total_value
+        total=total_value,
+        realized_pnl=realized_pnl
     )
-
     db.add(transaction)
 
     try:
@@ -570,16 +583,33 @@ def sell_stock(
             detail="Could not complete the sell transaction"
         )
 
+    holdings = (
+        db.query(Holding)
+        .filter(Holding.user_id == eff_user_id)
+        .all()
+    )
+
     return {
         "message": "Paper trade completed",
+        "order_id": order.id,
         "transaction": {
+            "order_id": order.id,
             "symbol": symbol,
             "side": "SELL",
             "quantity": trade.quantity,
             "price": trade.price,
-            "total": total_value
+            "total": total_value,
+            "realized_pnl": realized_pnl,
+            "avg_buy_price": avg_cost,
+            "remaining_quantity": remaining_qty
         },
-        "portfolio": get_portfolio(db)
+        "portfolio": {
+            "cash_balance": portfolio.cash_balance,
+            "holdings": {
+                item.symbol: item.quantity
+                for item in holdings
+            }
+        }
     }
 @app.post("/auth/signup", response_model=schemas.UserResponse, status_code=201)
 def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
