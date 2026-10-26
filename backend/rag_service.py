@@ -1,6 +1,7 @@
 
 import json
 import math
+import os
 from pathlib import Path
 from functools import lru_cache
 
@@ -14,14 +15,15 @@ import requests
 BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BACKEND_DIR.parent
 
-KNOWLEDGE_FILE = (
-    PROJECT_DIR / "rag" / "tradeiqx_knowledge.json"
-)
+# Check backend/rag (bundled container) then root rag directory
+KNOWLEDGE_FILE = BACKEND_DIR / "rag" / "tradeiqx_knowledge.json"
+if not KNOWLEDGE_FILE.exists():
+    KNOWLEDGE_FILE = PROJECT_DIR / "rag" / "tradeiqx_knowledge.json"
 
-OLLAMA_URL = "http://127.0.0.1:11434"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 
-CHAT_MODEL = "llama3.2:1b"
-EMBEDDING_MODEL = "nomic-embed-text"
+CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3.2:1b")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 
 
 # ---------------------------------

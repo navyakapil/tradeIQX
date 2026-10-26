@@ -25,19 +25,36 @@ TradeRequest = schemas.TradeRequest
 
 from sqlalchemy import text
 
+import os
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="TradeIQX API")
+
+ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "*")
+ALLOWED_ORIGINS = [orig.strip() for orig in ALLOWED_ORIGINS_RAW.split(",") if orig.strip()]
+if not ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 Base.metadata.create_all(bind=engine)
 
 # Auto-migrate SQLite schema columns for existing databases
-try:
-    with engine.connect() as _conn:
-        _result = _conn.execute(text("PRAGMA table_info(users)"))
-        _cols = [row[1] for row in _result.fetchall()]
-        if _cols and "created_at" not in _cols:
-            _conn.execute(text("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
-            _conn.commit()
-except Exception:
-    pass
+if getattr(engine.dialect, "name", "") == "sqlite":
+    try:
+        with engine.connect() as _conn:
+            _result = _conn.execute(text("PRAGMA table_info(users)"))
+            _cols = [row[1] for row in _result.fetchall()]
+            if _cols and "created_at" not in _cols:
+                _conn.execute(text("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
+                _conn.commit()
+    except Exception:
+        pass
 
 
 @app.exception_handler(SQLAlchemyError)
@@ -116,17 +133,17 @@ def home():
 
 
 @app.get("/health")
-def health_check(db: Session = Depends(get_db)):
-    db_status = "healthy"
+def health_check():
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+def readiness_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "healthy"}
     except Exception:
-        db_status = "unhealthy"
-
-    return {
-        "status": "healthy" if db_status == "healthy" else "degraded",
-        "database": db_status
-    }
+        raise HTTPException(status_code=503, detail="Database not ready")
 
 
 @app.get("/market/quote/{symbol}", response_model=schemas.MarketQuoteResponse)
