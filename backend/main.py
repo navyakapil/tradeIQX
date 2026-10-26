@@ -324,6 +324,56 @@ def get_portfolio(
         ],
     }
 
+
+@app.get("/transactions")
+@app.get("/api/transactions")
+def get_transactions(
+    side: Optional[str] = "ALL",
+    symbol: Optional[str] = None,
+    sort: Optional[str] = "newest",
+    db: Session = Depends(get_db),
+    user_id: Optional[int] = Depends(get_current_user_id),
+):
+    eff_user_id, _, _ = get_or_create_user_account(db, user_id)
+    query = db.query(Trade).filter(Trade.user_id == eff_user_id)
+
+    # Filter by side
+    if side and side.upper() in ["BUY", "SELL"]:
+        query = query.filter(Trade.side == side.upper())
+
+    # Filter by symbol search
+    if symbol and symbol.strip():
+        query = query.filter(Trade.symbol.ilike(f"%{symbol.strip()}%"))
+
+    # Sorting
+    sort_key = (sort or "newest").lower()
+    if sort_key == "oldest":
+        query = query.order_by(Trade.created_at.asc())
+    elif sort_key == "amount_desc":
+        query = query.order_by(Trade.total.desc())
+    elif sort_key == "amount_asc":
+        query = query.order_by(Trade.total.asc())
+    else:  # newest default
+        query = query.order_by(Trade.created_at.desc())
+
+    trades = query.all()
+
+    return [
+        {
+            "id": trade.id,
+            "order_id": trade.order_id,
+            "symbol": trade.symbol,
+            "side": trade.side,
+            "quantity": trade.quantity,
+            "price": round(trade.price, 2),
+            "total": round(trade.total, 2),
+            "realized_pnl": round(trade.realized_pnl, 2) if trade.realized_pnl is not None else 0.0,
+            "created_at": trade.created_at.isoformat() if trade.created_at else None,
+        }
+        for trade in trades
+    ]
+
+
 KNOWN_SYMBOLS = {
     "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
     "ITC", "SBIN", "WIPRO", "TATAMOTORS", "BHARTIARTL",
