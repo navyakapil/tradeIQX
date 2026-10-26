@@ -12,7 +12,11 @@ from models import Account
 from prices import get_stock_info
 from schemas import QuoteResponse, OrderCreate, OrderResponse
 from deps import get_current_account
-from services import execute_buy_order, execute_sell_order
+from services import (
+    execute_buy_order,
+    execute_sell_order,
+    get_existing_idempotent_order,
+)
 
 # Initialize database schema on startup
 Base.metadata.create_all(bind=engine)
@@ -60,7 +64,18 @@ def place_order(
     account: Account = Depends(get_current_account),
     db: Session = Depends(get_db),
 ):
-    """Places an order (BUY or SELL) with atomic execution and server price authority."""
+    """Places an order with optional idempotency protection against duplicate retries."""
+    # Check for duplicate idempotency submission
+    if payload.idempotency_key:
+        existing = get_existing_idempotent_order(
+            db=db,
+            user_id=account.user_id,
+            idempotency_key=payload.idempotency_key,
+        )
+        if existing:
+            # Return already-executed order without re-processing
+            return existing
+
     if payload.side == "BUY":
         return execute_buy_order(
             db=db,

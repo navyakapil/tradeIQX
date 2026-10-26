@@ -6,10 +6,26 @@ weighted-average price calculations, and transaction records.
 
 import uuid
 from datetime import datetime
+from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from models import Account, Holding, Order, Trade
 from prices import get_server_price
+
+
+def get_existing_idempotent_order(
+    db: Session,
+    user_id: str,
+    idempotency_key: Optional[str],
+) -> Optional[Order]:
+    """Checks whether an order with the same idempotency key was already executed for this user."""
+    if not idempotency_key or not idempotency_key.strip():
+        return None
+    return (
+        db.query(Order)
+        .filter(Order.user_id == user_id, Order.idempotency_key == idempotency_key.strip())
+        .first()
+    )
 
 
 def execute_buy_order(
@@ -85,7 +101,7 @@ def execute_buy_order(
             price=round(price, 2),
             total_value=total_cost,
             status="COMPLETED",
-            idempotency_key=idempotency_key,
+            idempotency_key=idempotency_key.strip() if idempotency_key else None,
             created_at=datetime.utcnow(),
         )
         db.add(order)
@@ -187,7 +203,7 @@ def execute_sell_order(
             price=round(price, 2),
             total_value=proceeds,
             status="COMPLETED",
-            idempotency_key=idempotency_key,
+            idempotency_key=idempotency_key.strip() if idempotency_key else None,
             created_at=datetime.utcnow(),
         )
         db.add(order)
