@@ -77,7 +77,7 @@ def run_trading_smoke_tests():
     assert port["unrealized_pnl"] == 0.0
     assert port["return_pct"] == 0.0
     assert len(port["holdings_detail"]) == 0
-    print("✓ Test 1 Passed: Empty portfolio returns zero-safe metrics and 10L cash.")
+    print("[PASS] Test 1 Passed: Empty portfolio returns zero-safe metrics and 10L cash.")
 
     # Test 2: Buy 10 @ 100
     buy1 = client.post(
@@ -87,7 +87,7 @@ def run_trading_smoke_tests():
     )
     assert buy1.status_code == 200, f"Buy 1 failed: {buy1.text}"
     assert buy1.json()["transaction"]["average_buy_price"] == 100.0
-    print("✓ Test 2 Passed: Buy 10 @ 100 recorded. Avg price = 100.0")
+    print("[PASS] Test 2 Passed: Buy 10 @ 100 recorded. Avg price = 100.0")
 
     # Test 3: Buy 10 @ 120 -> Weighted Avg = 110
     buy2 = client.post(
@@ -98,7 +98,7 @@ def run_trading_smoke_tests():
     assert buy2.status_code == 200, f"Buy 2 failed: {buy2.text}"
     avg = buy2.json()["transaction"]["average_buy_price"]
     assert avg == 110.0, f"Expected avg price 110.0, got {avg}"
-    print("✓ Test 3 Passed: Buy 10 @ 120 merged into holding. Weighted Avg = 110.0")
+    print("[PASS] Test 3 Passed: Buy 10 @ 120 merged into holding. Weighted Avg = 110.0")
 
     # Test 4: Sell 5 @ 130 -> Realized P&L = 5 * (130 - 110) = 100
     sell1 = client.post(
@@ -112,7 +112,7 @@ def run_trading_smoke_tests():
     remaining_qty = txn["remaining_quantity"]
     assert realized == 100.0, f"Expected realized P&L 100.0, got {realized}"
     assert remaining_qty == 15, f"Expected 15 remaining shares, got {remaining_qty}"
-    print("✓ Test 4 Passed: Sell 5 @ 130 recorded. Realized P&L = +100.0, Remaining = 15")
+    print("[PASS] Test 4 Passed: Sell 5 @ 130 recorded. Realized P&L = +100.0, Remaining = 15")
 
     # Test 5: Oversell Rejected
     oversell = client.post(
@@ -122,7 +122,7 @@ def run_trading_smoke_tests():
     )
     assert oversell.status_code == 400, f"Expected 400, got {oversell.status_code}"
     assert "Insufficient shares" in oversell.json()["detail"]
-    print("✓ Test 5 Passed: Oversell attempt rejected with HTTP 400 Insufficient shares.")
+    print("[PASS] Test 5 Passed: Oversell attempt rejected with HTTP 400 Insufficient shares.")
 
     # Test 6: Insufficient Cash Rejected
     huge_buy = client.post(
@@ -132,7 +132,7 @@ def run_trading_smoke_tests():
     )
     assert huge_buy.status_code == 400, f"Expected 400, got {huge_buy.status_code}"
     assert "Insufficient virtual cash" in huge_buy.json()["detail"]
-    print("✓ Test 6 Passed: Insufficient cash buy rejected with HTTP 400 Insufficient virtual cash.")
+    print("[PASS] Test 6 Passed: Insufficient cash buy rejected with HTTP 400 Insufficient virtual cash.")
 
     # Test 7: Persistence Simulation (Re-opening DB connection)
     test_engine.dispose()
@@ -150,7 +150,7 @@ def run_trading_smoke_tests():
         trades = session.query(models.Trade).filter(models.Trade.user_id == test_user_id).all()
         assert len(trades) == 3, f"Expected 3 trades, got {len(trades)}"
     new_engine.dispose()
-    print("✓ Test 7 Passed: Data persistence verified across database reconnect.")
+    print("[PASS] Test 7 Passed: Data persistence verified across database reconnect.")
 
 
 def run_rag_mentor_tests():
@@ -185,16 +185,16 @@ def run_rag_mentor_tests():
         print(f"  Answer Preview: {answer_preview}...")
         print("-" * 50)
 
-    print("✓ All 5 RAG Trading Mentor queries retrieved and verified.")
+    print("[PASS] All 5 RAG Trading Mentor queries retrieved and verified.")
 
 
 if __name__ == "__main__":
     try:
         run_trading_smoke_tests()
         run_rag_mentor_tests()
-        print("\n" + "★" * 60)
+        print("\n" + "*" * 60)
         print("ALL SMOKE TESTS COMPLETED SUCCESSFULLY!")
-        print("★" * 60)
+        print("*" * 60)
     finally:
         # Cleanup temp DB
         try:
