@@ -1,4 +1,6 @@
+
 package com.example.tradeiq_x
+
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +43,10 @@ object TradingStore {
         private set
 
     fun buy(symbol: String, quantity: Int): Boolean {
-        val price = prices[symbol.uppercase()]
+
+        val stock = symbol.uppercase()
+        val price = prices[stock]
+
         if (price == null) {
             message.value = "Stock price unavailable."
             return false
@@ -52,6 +57,14 @@ object TradingStore {
             return false
         }
 
+        val oldQuantity = holdings[stock] ?: 0
+
+        // Prevent integer overflow when adding shares.
+        if (quantity > Int.MAX_VALUE - oldQuantity) {
+            message.value = "Quantity exceeds the allowed limit."
+            return false
+        }
+
         val total = price * quantity
 
         if (total > balance.value) {
@@ -59,8 +72,6 @@ object TradingStore {
             return false
         }
 
-        val stock = symbol.uppercase()
-        val oldQuantity = holdings[stock] ?: 0
         val oldAverage = averagePrices[stock] ?: 0.0
         val newQuantity = oldQuantity + quantity
 
@@ -87,6 +98,7 @@ object TradingStore {
     }
 
     fun sell(symbol: String, quantity: Int): Boolean {
+
         val stock = symbol.uppercase()
         val price = prices[stock]
 
