@@ -24,8 +24,30 @@ from prices import get_current_price
 
 TradeRequest = schemas.TradeRequest
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="TradeIQX API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 Base.metadata.create_all(bind=engine)
+
+@app.on_event("startup")
+def startup_preload_retriever():
+    try:
+        from rag.tradeiqx_retriever import get_embeddings
+        logger.info("Preloading TradeIQX RAG embeddings on startup...")
+        get_embeddings()
+        logger.info("TradeIQX RAG embeddings preloaded.")
+    except Exception as exc:
+        logger.warning(f"RAG embedding preload notice: {exc}")
+
 
 
 @app.exception_handler(SQLAlchemyError)
@@ -138,6 +160,7 @@ def home():
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health_check(db: Session = Depends(get_db)):
     db_status = "healthy"
     try:
