@@ -1,4 +1,3 @@
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -22,9 +21,29 @@ android {
             "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val releaseBackendUrl: String = run {
+        val prop = project.findProperty("TRADEIQX_BACKEND_URL") as? String
+        if (!prop.isNullOrBlank()) return@run prop
+
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            val localProps = java.util.Properties().apply {
+                localPropsFile.inputStream().use { load(it) }
+            }
+            val fromLocal = localProps.getProperty("tradeiqx.backend.url")
+                ?: localProps.getProperty("TRADEIQX_BACKEND_URL")
+            if (!fromLocal.isNullOrBlank()) return@run fromLocal
+        }
+        "https://tradeiqx-backend-service.a.run.app"
+    }
+
     buildTypes {
+        debug {
+            buildConfigField("String", "BACKEND_BASE_URL", "\"\"")
+        }
         release {
             isMinifyEnabled = false
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$releaseBackendUrl\"")
         }
     }
 
@@ -35,6 +54,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

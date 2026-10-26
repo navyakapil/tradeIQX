@@ -15,7 +15,12 @@ import java.util.concurrent.TimeUnit
 object AIService {
 
     // Android Emulator -> FastAPI running on Windows
-    private const val BASE_URL = "http://127.0.0.1:8002"
+    private val BASE_URL: String
+        get() = if (BuildConfig.DEBUG || BuildConfig.BACKEND_BASE_URL.isBlank()) {
+            "http://127.0.0.1:8002"
+        } else {
+            BackendApi.baseUrl
+        }
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(180, TimeUnit.SECONDS)
