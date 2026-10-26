@@ -15,7 +15,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val MarketGreen = Color(0xFF16A34A)
 private val MarketDark = Color(0xFF0F172A)
 private val MarketGrey = Color(0xFF64748B)
 
@@ -123,7 +122,7 @@ fun MarketWatchScreen(
             singleLine = true,
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MarketGreen,
+                focusedBorderColor = MarketColors.GainGreen,
                 unfocusedBorderColor = Color(0xFFE2E8F0),
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White
@@ -153,7 +152,7 @@ fun MarketWatchScreen(
                         .weight(1f)
                         .clickable { selectedCategory = category },
                     shape = RoundedCornerShape(10.dp),
-                    color = if (isSelected) MarketGreen else Color.White
+                    color = if (isSelected) MarketColors.GainGreen else Color.White
                 ) {
                     Box(
                         modifier = Modifier.padding(
@@ -256,7 +255,7 @@ fun MarketWatchScreen(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFDCFCE7)
+                            color = MarketColors.GainGreenLight
                         ) {
                             Box(
                                 modifier = Modifier.size(44.dp),
@@ -264,7 +263,7 @@ fun MarketWatchScreen(
                             ) {
                                 Text(
                                     text = stock.symbol.take(1),
-                                    color = MarketGreen,
+                                    color = MarketColors.GainGreen,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -309,11 +308,7 @@ fun MarketWatchScreen(
 
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = if (stock.isPositive) {
-                                    Color(0xFFDCFCE7)
-                                } else {
-                                    Color(0xFFFEE2E2)
-                                }
+                                color = MarketColors.changeBackground(stock.isPositive)
                             ) {
                                 Text(
                                     text = stock.change,
@@ -323,11 +318,7 @@ fun MarketWatchScreen(
                                     ),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (stock.isPositive) {
-                                        MarketGreen
-                                    } else {
-                                        Color(0xFFDC2626)
-                                    }
+                                    color = MarketColors.changeColor(stock.isPositive)
                                 )
                             }
                         }

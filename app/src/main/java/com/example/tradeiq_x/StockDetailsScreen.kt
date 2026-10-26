@@ -17,8 +17,6 @@ import androidx.compose.ui.unit.sp
 
 private val DetailsBg = Color(0xFF071522)
 private val DetailsCard = Color(0xFF132838)
-private val DetailsGreen = Color(0xFF32D49A)
-private val DetailsRed = Color(0xFFFF5364)
 private val DetailsWhite = Color(0xFFF8FAFC)
 private val DetailsMuted = Color(0xFF9FB0C0)
 
@@ -121,8 +119,7 @@ fun StockDetailsScreen(
                 ) {
                     Text(
                         text = MarketFormatters.formatPercentChange(sampleChange),
-                        color = if (sampleChange >= 0)
-                            DetailsGreen else DetailsRed,
+                        color = MarketColors.darkChangeColor(sampleChange >= 0),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -160,10 +157,7 @@ fun StockDetailsScreen(
                                 .weight(1f)
                                 .height(height.dp)
                                 .background(
-                                    if (sampleChange >= 0)
-                                        DetailsGreen
-                                    else
-                                        DetailsRed,
+                                    MarketColors.darkChangeColor(sampleChange >= 0),
                                     RoundedCornerShape(
                                         topStart = 3.dp,
                                         topEnd = 3.dp
@@ -240,7 +234,7 @@ fun StockDetailsScreen(
                     .height(54.dp),
                 shape = RoundedCornerShape(15.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DetailsGreen,
+                    containerColor = MarketColors.DarkGainGreen,
                     contentColor = Color(0xFF062017)
                 )
             ) {
@@ -260,7 +254,7 @@ fun StockDetailsScreen(
                     .height(54.dp),
                 shape = RoundedCornerShape(15.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DetailsRed,
+                    containerColor = MarketColors.DarkLossRed,
                     contentColor = Color.White
                 )
             ) {
