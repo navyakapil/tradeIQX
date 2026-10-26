@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -83,6 +85,7 @@ fun MarketWatchScreen(
         "Top Losers"
     )
 
+    // Filter and stably sort stocks deterministically by ticker symbol
     val filteredStocks = stocksList.filter { stock ->
         val matchesSearch =
             stock.symbol.contains(searchQuery, ignoreCase = true) ||
@@ -95,7 +98,7 @@ fun MarketWatchScreen(
         }
 
         matchesSearch && matchesCategory
-    }
+    }.sortedBy { it.symbol }
 
     Column(
         modifier = Modifier
@@ -111,7 +114,9 @@ fun MarketWatchScreen(
                 text = "‹",
                 fontSize = 36.sp,
                 color = MarketDark,
-                modifier = Modifier.clickable { onBack() }
+                modifier = Modifier
+                    .semantics { contentDescription = "Navigate back" }
+                    .clickable { onBack() }
             )
 
             Spacer(Modifier.width(12.dp))
@@ -136,14 +141,17 @@ fun MarketWatchScreen(
                 CircularProgressIndicator(
                     modifier = Modifier
                         .size(24.dp)
-                        .padding(2.dp),
+                        .padding(2.dp)
+                        .semantics { contentDescription = "Refreshing stock quotes" },
                     color = MarketColors.GainGreen,
                     strokeWidth = 2.dp
                 )
             } else {
                 IconButton(
                     onClick = { refreshCount++ },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier
+                        .size(36.dp)
+                        .semantics { contentDescription = "Refresh stock quotes" }
                 ) {
                     Text(
                         text = "↻",
@@ -158,7 +166,8 @@ fun MarketWatchScreen(
 
             Text(
                 text = "📈",
-                fontSize = 26.sp
+                fontSize = 26.sp,
+                modifier = Modifier.semantics { contentDescription = "Market trend indicator" }
             )
         }
 
@@ -167,7 +176,9 @@ fun MarketWatchScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "Search stocks by name or ticker" },
             placeholder = {
                 Text("Search stocks, e.g. Reliance, TCS...")
             },
@@ -205,6 +216,7 @@ fun MarketWatchScreen(
                 Surface(
                     modifier = Modifier
                         .weight(1f)
+                        .semantics { contentDescription = "Filter category $category" }
                         .clickable { selectedCategory = category },
                     shape = RoundedCornerShape(10.dp),
                     color = if (isSelected) MarketColors.GainGreen else Color.White
@@ -287,10 +299,16 @@ fun MarketWatchScreen(
             verticalArrangement = Arrangement.spacedBy(9.dp),
             contentPadding = PaddingValues(vertical = 10.dp)
         ) {
-            items(filteredStocks) { stock ->
+            items(
+                items = filteredStocks,
+                key = { it.symbol }
+            ) { stock ->
+                val stockAccessibilityDesc = "${stock.symbol}, ${stock.name}, Price ${stock.price}, Change ${stock.change}"
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .semantics { contentDescription = stockAccessibilityDesc }
                         .clickable {
                             onStockSelected(stock.symbol)
                         },
