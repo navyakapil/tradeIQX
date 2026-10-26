@@ -58,22 +58,22 @@ def market_quote(symbol: str):
     try:
         return get_live_quote(symbol)
 
-    except ValueError as exc:
+    except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=str(exc),
+            detail="Invalid stock symbol requested",
         )
 
-    except LookupError as exc:
+    except LookupError:
         raise HTTPException(
             status_code=404,
-            detail=str(exc),
+            detail="Stock quote not found for this symbol",
         )
 
-    except RuntimeError as exc:
+    except RuntimeError:
         raise HTTPException(
             status_code=503,
-            detail=str(exc),
+            detail="Market data service temporarily unavailable",
         )
 
     except Exception:

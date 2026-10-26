@@ -31,19 +31,22 @@ def get_groww_client() -> GrowwAPI:
         GrowwAPI: Authenticated API client instance.
 
     Raises:
-        RuntimeError: If Groww API credentials are not set in the environment.
+        RuntimeError: If Groww API credentials are not set or authentication fails.
     """
     api_key = os.getenv("GROWW_API_KEY")
     secret = os.getenv("GROWW_API_SECRET")
 
     if not api_key or not secret:
-        raise RuntimeError("Groww API credentials are not configured")
+        raise RuntimeError("Market data provider credentials are not configured")
 
-    token = GrowwAPI.get_access_token(
-        api_key=api_key,
-        secret=secret,
-    )
-    return GrowwAPI(token)
+    try:
+        token = GrowwAPI.get_access_token(
+            api_key=api_key,
+            secret=secret,
+        )
+        return GrowwAPI(token)
+    except Exception:
+        raise RuntimeError("Failed to authenticate with market data provider") from None
 
 
 def get_live_quote(symbol: str) -> dict:
@@ -64,20 +67,25 @@ def get_live_quote(symbol: str) -> dict:
     Raises:
         ValueError: If symbol is empty or contains non-alphanumeric characters.
         LookupError: If no valid price quote is returned by the upstream provider.
-        RuntimeError: If upstream client authentication fails.
+        RuntimeError: If upstream client authentication or connection fails.
     """
     symbol = symbol.strip().upper()
 
     if not symbol.isalnum() or not symbol:
         raise ValueError("Invalid stock symbol")
 
-    client = get_groww_client()
     trading_symbol = f"{DEFAULT_EXCHANGE_PREFIX}{symbol}"
 
-    result = client.get_ltp(
-        segment=client.SEGMENT_CASH,
-        exchange_trading_symbols=(trading_symbol,),
-    )
+    try:
+        client = get_groww_client()
+        result = client.get_ltp(
+            segment=client.SEGMENT_CASH,
+            exchange_trading_symbols=(trading_symbol,),
+        )
+    except (ValueError, LookupError, RuntimeError):
+        raise
+    except Exception:
+        raise RuntimeError("Upstream market provider request failed") from None
 
     price = result.get(trading_symbol)
 
