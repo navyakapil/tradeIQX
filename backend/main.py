@@ -422,6 +422,31 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
             "email": existing_user.email
         }
 
+
+@app.get("/auth/me", response_model=schemas.UserProfile)
+def get_current_user_profile(
+    user_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    if user_id is not None:
+        user = db.query(User).filter(User.id == user_id).first()
+    else:
+        user = db.query(User).order_by(User.id.asc()).first()
+
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    portfolio = db.query(Portfolio).filter(Portfolio.user_id == user.id).first()
+    cash_balance = portfolio.cash_balance if portfolio else 100000.0
+
+    return schemas.UserProfile(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        created_at=user.created_at,
+        cash_balance=round(cash_balance, 2)
+    )
+
 # AI Mentor imports
 import logging
 from rag_service import answer_question
