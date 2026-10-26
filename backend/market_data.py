@@ -4,13 +4,19 @@ from datetime import datetime, timezone
 from functools import lru_cache
 
 from dotenv import load_dotenv
-from growwapi import GrowwAPI
+try:
+    from growwapi import GrowwAPI
+except ImportError:
+    GrowwAPI = None
 
 load_dotenv()
 
 
 @lru_cache(maxsize=1)
 def get_groww_client():
+    if GrowwAPI is None:
+        raise RuntimeError("Groww API library (growwapi) is not installed")
+
     api_key = os.getenv("GROWW_API_KEY")
     secret = os.getenv("GROWW_API_SECRET")
 
