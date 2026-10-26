@@ -1,12 +1,14 @@
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,7 +33,8 @@ fun StockDetailsScreen(
     val stock = symbol.uppercase()
     val fallbackPrice = TradingStore.prices[stock] ?: 0.0
 
-    var selectedRange by remember { mutableStateOf(ChartRange.ONE_DAY) }
+    // Selected chart range preserved across recomposition and device rotation
+    var selectedRange by rememberSaveable { mutableStateOf(ChartRange.ONE_DAY) }
     var currentQuote by remember { mutableStateOf<StockQuote?>(null) }
     var candles by remember { mutableStateOf<List<PriceCandle>>(emptyList()) }
     var isMarketLoading by remember { mutableStateOf(false) }
@@ -164,11 +167,54 @@ fun StockDetailsScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                Text(
-                    text = "Price movement",
-                    color = DetailsMuted,
-                    fontSize = 14.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Price movement",
+                        color = DetailsMuted,
+                        fontSize = 14.sp
+                    )
+
+                    Text(
+                        text = "Range: ${selectedRange.label}",
+                        color = DetailsMuted,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // Interactive range selector chips preserved across recomposition
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ChartRange.values().forEach { rangeOption ->
+                        val isSelected = selectedRange == rangeOption
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MarketColors.DarkGainGreen else Color(0xFF1E384D),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedRange = rangeOption }
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = rangeOption.label,
+                                    color = if (isSelected) Color(0xFF062017) else DetailsWhite,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(4.dp))
 
                 // Chart container with loading, empty/error, and candle visualizer states
                 Box(
