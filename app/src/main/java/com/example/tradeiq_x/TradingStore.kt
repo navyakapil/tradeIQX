@@ -274,13 +274,14 @@ object TradingStore {
         symbol: String,
         quantity: Int,
         price: Double,
-        context: Context? = null
+        context: Context? = null,
+        clientOrderId: String? = null
     ): Pair<Boolean, String> {
         if (context != null) init(context)
         isSyncing.value = true
         syncError.value = null
 
-        return when (val res = TradingApi.buy(symbol, quantity, price)) {
+        return when (val res = TradingApi.buy(symbol, quantity, price, clientOrderId)) {
             is ApiResult.Success -> {
                 message.value = res.data.message
                 refreshPortfolio(context)
@@ -301,13 +302,14 @@ object TradingStore {
         symbol: String,
         quantity: Int,
         price: Double,
-        context: Context? = null
+        context: Context? = null,
+        clientOrderId: String? = null
     ): Pair<Boolean, String> {
         if (context != null) init(context)
         isSyncing.value = true
         syncError.value = null
 
-        return when (val res = TradingApi.sell(symbol, quantity, price)) {
+        return when (val res = TradingApi.sell(symbol, quantity, price, clientOrderId)) {
             is ApiResult.Success -> {
                 message.value = res.data.message
                 refreshPortfolio(context)

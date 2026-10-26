@@ -191,7 +191,8 @@ fun BuyScreen(
                 isError = false
 
                 scope.launch {
-                    val (success, msg) = TradingStore.executeBuy(stock, quantity, price, context)
+                    val clientOrderId = "buy_${stock}_${System.currentTimeMillis()}_${(1000..9999).random()}"
+                    val (success, msg) = TradingStore.executeBuy(stock, quantity, price, context, clientOrderId)
                     isSubmitting = false
                     statusMessage = msg
                     isError = !success

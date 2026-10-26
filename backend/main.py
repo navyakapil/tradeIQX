@@ -445,6 +445,33 @@ def buy_stock(
             detail="Insufficient virtual cash"
         )
 
+    # Check for duplicate client_order_id
+    client_oid = getattr(trade, "client_order_id", None)
+    if client_oid:
+        existing_order = db.query(Order).filter(
+            Order.user_id == eff_user_id,
+            Order.client_order_id == client_oid
+        ).first()
+        if existing_order:
+            holdings = db.query(Holding).filter(Holding.user_id == eff_user_id).all()
+            return {
+                "message": "Order already processed (duplicate detected)",
+                "order_id": existing_order.id,
+                "transaction": {
+                    "order_id": existing_order.id,
+                    "symbol": existing_order.symbol,
+                    "side": existing_order.side,
+                    "quantity": existing_order.quantity,
+                    "price": existing_order.price,
+                    "total": round(existing_order.quantity * existing_order.price, 2),
+                    "average_buy_price": existing_order.price
+                },
+                "portfolio": {
+                    "cash_balance": portfolio.cash_balance,
+                    "holdings": {item.symbol: item.quantity for item in holdings}
+                }
+            }
+
     # Record order first
     client_oid = getattr(trade, "client_order_id", None)
     order = Order(
@@ -594,6 +621,36 @@ def sell_stock(
     avg_cost = holding.average_price
     realized_pnl = round(trade.quantity * (trade.price - avg_cost), 2)
     total_value = round(trade.quantity * trade.price, 2)
+
+    # Check for duplicate client_order_id
+    client_oid = getattr(trade, "client_order_id", None)
+    if client_oid:
+        existing_order = db.query(Order).filter(
+            Order.user_id == eff_user_id,
+            Order.client_order_id == client_oid
+        ).first()
+        if existing_order:
+            existing_trade = db.query(Trade).filter(Trade.order_id == existing_order.id).first()
+            holdings = db.query(Holding).filter(Holding.user_id == eff_user_id).all()
+            return {
+                "message": "Order already processed (duplicate detected)",
+                "order_id": existing_order.id,
+                "transaction": {
+                    "order_id": existing_order.id,
+                    "symbol": existing_order.symbol,
+                    "side": existing_order.side,
+                    "quantity": existing_order.quantity,
+                    "price": existing_order.price,
+                    "total": round(existing_order.quantity * existing_order.price, 2),
+                    "realized_pnl": existing_trade.realized_pnl if existing_trade else 0.0,
+                    "avg_buy_price": existing_order.price,
+                    "remaining_quantity": holding.quantity
+                },
+                "portfolio": {
+                    "cash_balance": portfolio.cash_balance,
+                    "holdings": {item.symbol: item.quantity for item in holdings}
+                }
+            }
 
     # Record order
     client_oid = getattr(trade, "client_order_id", None)
