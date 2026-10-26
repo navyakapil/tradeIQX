@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, text
+from sqlalchemy import or_, text, func
 from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 
@@ -417,7 +417,10 @@ def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
         validate_password_policy(user.password)
 
         existing_user = db.query(User).filter(
-            or_(User.email == email, User.username == username)
+            or_(
+                func.lower(User.email) == email,
+                func.lower(User.username) == username.lower()
+            )
         ).first()
 
         if existing_user:
@@ -454,7 +457,7 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
         email = str(user.email).strip().lower()
 
         existing_user = db.query(User).filter(
-            User.email == email
+            func.lower(User.email) == email
         ).first()
 
         if existing_user is None:
