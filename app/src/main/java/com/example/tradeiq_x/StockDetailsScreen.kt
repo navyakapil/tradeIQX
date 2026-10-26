@@ -6,8 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
 
 private val DetailsBg = Color(0xFF071522)
 private val DetailsCard = Color(0xFF132838)
@@ -29,8 +29,32 @@ fun StockDetailsScreen(
     onBack: () -> Unit
 ) {
     val stock = symbol.uppercase()
-    val price = TradingStore.prices[stock] ?: 0.0
-    val lastUpdated = remember { MarketFormatters.formatRelativeTime(null) }
+    val fallbackPrice = TradingStore.prices[stock] ?: 0.0
+
+    var selectedRange by remember { mutableStateOf(ChartRange.ONE_DAY) }
+    var currentQuote by remember { mutableStateOf<StockQuote?>(null) }
+    var candles by remember { mutableStateOf<List<PriceCandle>>(emptyList()) }
+    var isMarketLoading by remember { mutableStateOf(false) }
+
+    // Automatically cancels previous in-flight coroutine if stock or range changes
+    LaunchedEffect(stock, selectedRange) {
+        isMarketLoading = true
+        try {
+            val fetchedQuote = MarketDataManager.repository.getQuote(stock)
+            val fetchedCandles = MarketDataManager.repository.getHistory(stock, selectedRange)
+            currentQuote = fetchedQuote
+            candles = fetchedCandles
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Retain existing state on transient failure
+        } finally {
+            isMarketLoading = false
+        }
+    }
+
+    val price = currentQuote?.price ?: fallbackPrice
+    val lastUpdated = MarketFormatters.formatRelativeTime(currentQuote?.lastUpdated)
 
     val companyNames = mapOf(
         "RELIANCE" to "Reliance Industries Ltd.",

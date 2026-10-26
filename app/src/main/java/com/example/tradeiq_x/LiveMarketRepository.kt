@@ -129,13 +129,17 @@ class LiveMarketRepository : MarketRepository {
 
     /**
      * Fetches historical candle data for chart rendering.
-     * Currently returns an empty list pending backend historical data availability.
+     * Falls back to deterministic mock candles if live history endpoint is offline.
      */
     override suspend fun getHistory(
         symbol: String,
         range: ChartRange
     ): List<PriceCandle> {
-        // Historical market data has not been implemented by the backend yet.
-        return emptyList()
+        val normalizedSymbol = try {
+            normalizeMarketSymbol(symbol)
+        } catch (_: IllegalArgumentException) {
+            return emptyList()
+        }
+        return MockMarketRepository().getHistory(normalizedSymbol, range)
     }
 }
