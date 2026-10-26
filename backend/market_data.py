@@ -4,18 +4,30 @@ Provides access to live stock quotes and market data via the Groww API SDK.
 """
 
 import logging
-import math
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from typing import Any, Dict, List, Tuple
 
 from dotenv import load_dotenv
 from growwapi import GrowwAPI
+from growwapi.groww.exceptions import (
+    GrowwAPIAuthenticationException,
+    GrowwAPIAuthorisationException,
+    GrowwAPIException,
+    GrowwAPINotFoundException,
+    GrowwAPIRateLimitException,
+    GrowwAPITimeoutException,
+)
 
-load_dotenv()
+# Load .env relative to this file or current working directory
+_dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(_dotenv_path):
+    load_dotenv(_dotenv_path)
+else:
+    load_dotenv()
 
 logger = logging.getLogger("market_data")
 
@@ -28,6 +40,21 @@ STALE_QUOTE_THRESHOLD_SECONDS: int = 60
 
 SYMBOL_REGEX = re.compile(r"^[A-Z0-9&-]{1,20}$")
 SUPPORTED_HISTORY_RANGES: Tuple[str, ...] = ("1D", "1W", "1M", "1Y")
+
+
+class MarketProviderAuthorisationError(Exception):
+    """Raised when upstream market data provider returns 401/403 unauthorized."""
+    pass
+
+
+class MarketProviderRateLimitError(Exception):
+    """Raised when upstream market data provider rate limits requests (429)."""
+    pass
+
+
+class MarketProviderUnavailableError(Exception):
+    """Raised when market data provider credentials are missing, times out, or is offline."""
+    pass
 
 
 def normalize_symbol(raw_symbol: str) -> str:
@@ -101,14 +128,15 @@ def get_groww_client() -> GrowwAPI:
         GrowwAPI: Authenticated API client instance.
 
     Raises:
-        RuntimeError: If Groww API credentials are not set or authentication fails.
+        MarketProviderUnavailableError: If Groww API credentials are not set.
+        MarketProviderAuthorisationError: If credentials fail authentication with 401/403.
     """
     api_key = os.getenv("GROWW_API_KEY")
     secret = os.getenv("GROWW_API_SECRET")
 
     if not api_key or not secret:
         logger.warning("Groww API credentials missing in environment")
-        raise RuntimeError("Market data provider credentials are not configured")
+        raise MarketProviderUnavailableError("unavailable")
 
     try:
         logger.info("Authenticating with Groww API provider")
@@ -118,9 +146,12 @@ def get_groww_client() -> GrowwAPI:
         )
         logger.info("Groww API authentication token exchanged successfully")
         return GrowwAPI(token)
-    except Exception:
-        logger.error("Authentication with Groww API provider failed")
-        raise RuntimeError("Failed to authenticate with market data provider") from None
+    except (GrowwAPIAuthorisationException, GrowwAPIAuthenticationException):
+        logger.error("Authentication with Groww API provider unauthorized (401/403)")
+        raise MarketProviderAuthorisationError("provider_unauthorised") from None
+    except (GrowwAPITimeoutException, GrowwAPIException, Exception) as exc:
+        logger.error("Authentication with Groww API provider failed: %s", type(exc).__name__)
+        raise MarketProviderUnavailableError("unavailable") from None
 
 
 def get_live_quote(symbol: str) -> Dict[str, Any]:
@@ -137,12 +168,17 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
             - source (str): Data provider name ("Groww").
             - fetched_at (str): ISO 8601 UTC timestamp of retrieval.
             - freshness (str): Freshness status of the quote.
-            - previous_close (float): Previous day closing price.
+            - previous_close (float or None): Previous day closing price.
+            - change (float or None): Absolute price change.
+            - change_percent (float or None): Percentage change.
+            - status (str): Market data status ("LIVE", "DELAYED", "UNAUTHORISED", "OFFLINE").
 
     Raises:
-        ValueError: If symbol is empty or contains non-alphanumeric characters.
+        ValueError: If symbol is empty or invalid.
         LookupError: If no valid price quote is returned by the upstream provider.
-        RuntimeError: If upstream client authentication or connection fails.
+        MarketProviderAuthorisationError: If upstream client is unauthorized (403).
+        MarketProviderRateLimitError: If provider rate limit exceeded (429).
+        MarketProviderUnavailableError: If provider is offline or times out.
     """
     symbol = normalize_symbol(symbol)
     trading_symbol = f"{DEFAULT_EXCHANGE_PREFIX}{symbol}"
@@ -154,11 +190,17 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
             segment=client.SEGMENT_CASH,
             exchange_trading_symbols=(trading_symbol,),
         )
-    except (ValueError, LookupError, RuntimeError):
+    except (GrowwAPIAuthorisationException, GrowwAPIAuthenticationException):
+        raise MarketProviderAuthorisationError("provider_unauthorised") from None
+    except GrowwAPIRateLimitException:
+        raise MarketProviderRateLimitError("rate_limited") from None
+    except GrowwAPINotFoundException:
+        raise LookupError(f"No quote returned for symbol {symbol}") from None
+    except (MarketProviderAuthorisationError, MarketProviderRateLimitError, MarketProviderUnavailableError):
         raise
-    except Exception:
-        logger.warning("Upstream market provider call failed for symbol=%s", symbol)
-        raise RuntimeError("Upstream market provider request failed") from None
+    except Exception as exc:
+        logger.warning("Upstream market provider call failed for symbol=%s: %s", symbol, type(exc).__name__)
+        raise MarketProviderUnavailableError("unavailable") from None
 
     price = result.get(trading_symbol)
 
@@ -174,70 +216,120 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
         "currency": DEFAULT_CURRENCY,
         "source": DEFAULT_SOURCE,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
-        "freshness": DEFAULT_FRESHNESS,
-        "previous_close": 0.0,
+        "freshness": "live",
+        "previous_close": None,
+        "change": None,
+        "change_percent": None,
+        "status": "LIVE",
     }
 
 
 def get_stock_history(symbol: str, range_str: str = "1D") -> Dict[str, Any]:
-    """Fetches historical price candles for the specified symbol and range.
+    """Fetches real historical price candles for the specified symbol and range via Groww SDK.
+
+    Maps ranges 1D/1W/1M/1Y to supported intervals, executes live SDK historical candle call,
+    and validates ascending timestamps and OHLC validity. Never fabricates synthetic candles.
 
     Args:
         symbol: Stock ticker symbol.
         range_str: History time range ('1D', '1W', '1M', '1Y').
 
     Returns:
-        dict: Object containing symbol, range, and list of PriceCandle dicts.
+        dict: Object containing symbol, range, validated candles list, and status.
 
     Raises:
         ValueError: If symbol or range is invalid.
+        LookupError: If symbol is not found.
+        MarketProviderAuthorisationError: If Groww credentials lack permissions (403).
+        MarketProviderRateLimitError: If rate limited (429).
+        MarketProviderUnavailableError: If provider is offline or times out (503).
     """
     clean_symbol = normalize_symbol(symbol)
     clean_range = validate_history_range(range_str)
-    logger.info("Fetching history for symbol=%s range=%s", clean_symbol, clean_range)
+    logger.info("Fetching real history for symbol=%s range=%s", clean_symbol, clean_range)
 
-    # Determine base price: attempt live quote or fallback to baseline
-    base_price = 1000.0
+    client = get_groww_client()
+    trading_symbol = f"{DEFAULT_EXCHANGE_PREFIX}{clean_symbol}"
+
+    now = datetime.now(timezone.utc)
+    if clean_range == "1D":
+        start_time = now - timedelta(days=1)
+        interval_min = 5
+    elif clean_range == "1W":
+        start_time = now - timedelta(days=7)
+        interval_min = 60
+    elif clean_range == "1M":
+        start_time = now - timedelta(days=30)
+        interval_min = 1440
+    elif clean_range == "1Y":
+        start_time = now - timedelta(days=365)
+        interval_min = 1440
+    else:
+        raise ValueError(f"Unsupported history range: {clean_range}")
+
+    start_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
+    end_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
     try:
-        quote = get_live_quote(clean_symbol)
-        base_price = quote["price"]
-    except Exception:
-        logger.debug("Falling back to default base price for symbol=%s history", clean_symbol)
+        raw_response = client.get_historical_candle_data(
+            trading_symbol=trading_symbol,
+            exchange="NSE",
+            segment=client.SEGMENT_CASH,
+            start_time=start_str,
+            end_time=end_str,
+            interval_in_minutes=interval_min,
+            timeout=GROWW_API_TIMEOUT_SECONDS,
+        )
+    except (GrowwAPIAuthorisationException, GrowwAPIAuthenticationException):
+        raise MarketProviderAuthorisationError("provider_unauthorised") from None
+    except GrowwAPIRateLimitException:
+        raise MarketProviderRateLimitError("rate_limited") from None
+    except GrowwAPINotFoundException:
+        raise LookupError(f"No history found for symbol {clean_symbol}") from None
+    except (MarketProviderAuthorisationError, MarketProviderRateLimitError, MarketProviderUnavailableError):
+        raise
+    except Exception as exc:
+        logger.warning("Upstream history call failed: %s", type(exc).__name__)
+        raise MarketProviderUnavailableError("unavailable") from None
 
-    range_configs = {
-        "1D": {"count": 24, "interval_ms": 3600 * 1000},
-        "1W": {"count": 7, "interval_ms": 86400 * 1000},
-        "1M": {"count": 30, "interval_ms": 86400 * 1000},
-        "1Y": {"count": 12, "interval_ms": 30 * 86400 * 1000},
-    }
+    # Parse and validate candles strictly (ascending timestamps, high>=max(open,close), low<=min)
+    raw_candles = raw_response.get("candles") if isinstance(raw_response, dict) else []
+    validated_candles: List[Dict[str, Any]] = []
+    last_timestamp = -1
 
-    config = range_configs[clean_range]
-    count = config["count"]
-    interval_ms = config["interval_ms"]
-    now_ms = int(time.time() * 1000)
+    if raw_candles:
+        for item in raw_candles:
+            if isinstance(item, (list, tuple)) and len(item) >= 5:
+                ts, o, h, l, c = item[0], float(item[1]), float(item[2]), float(item[3]), float(item[4])
+                v = int(item[5]) if len(item) > 5 else 0
+            elif isinstance(item, dict):
+                ts = item.get("timestamp") or item.get("time")
+                o, h, l, c = float(item["open"]), float(item["high"]), float(item["low"]), float(item["close"])
+                v = int(item.get("volume", 0))
+            else:
+                continue
 
-    candles: List[Dict[str, Any]] = []
-    for i in range(count):
-        variation = math.sin(i * 0.7) * 0.015
-        open_val = base_price * (1.0 + variation)
-        close_val = base_price * (1.0 + variation + math.cos(i) * 0.004)
-        high_val = max(open_val, close_val) * 1.003
-        low_val = min(open_val, close_val) * 0.997
-        ts = now_ms - (count - 1 - i) * interval_ms
+            # Ascending timestamp validation
+            if ts is None or (last_timestamp != -1 and ts < last_timestamp):
+                continue
 
-        candles.append({
-            "timestamp": ts,
-            "open": round(open_val, 2),
-            "high": round(high_val, 2),
-            "low": round(low_val, 2),
-            "close": round(close_val, 2),
-            "volume": int(10000 + abs(math.sin(i)) * 50000),
-        })
+            # OHLC integrity check
+            if h < max(o, c) or l > min(o, c) or l < 0:
+                continue
 
-    logger.info("History candles generated for symbol=%s range=%s count=%d", clean_symbol, clean_range, len(candles))
+            validated_candles.append({
+                "timestamp": int(ts),
+                "open": round(o, 2),
+                "high": round(h, 2),
+                "low": round(l, 2),
+                "close": round(c, 2),
+                "volume": v,
+            })
+            last_timestamp = ts
 
     return {
         "symbol": clean_symbol,
         "range": clean_range,
-        "candles": candles,
+        "candles": validated_candles,
+        "status": "LIVE",
     }
