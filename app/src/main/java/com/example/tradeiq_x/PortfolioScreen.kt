@@ -26,16 +26,9 @@ private val PortText = Color(0xFFF8FAFC)
 private val PortMuted = Color(0xFF9FB0C0)
 private val PortBorder = Color(0xFF1E3A4B)
 
-private fun portMoney(value: Double): String =
-    "₹" + NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-    }.format(value)
+private fun portMoney(value: Double): String = Formatters.formatInr(value)
 
-private fun portPercent(value: Double): String {
-    val sign = if (value > 0) "+" else ""
-    return "$sign${String.format(Locale.US, "%.2f", value)}%"
-}
+private fun portPercent(value: Double): String = Formatters.formatSignedPercent(value)
 
 @Composable
 fun PortfolioScreen(

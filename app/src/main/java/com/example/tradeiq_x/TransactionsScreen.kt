@@ -32,25 +32,9 @@ private val TxText = Color(0xFFF8FAFC)
 private val TxMuted = Color(0xFF9FB0C0)
 private val TxBorder = Color(0xFF1E3A4B)
 
-private fun txMoney(value: Double): String =
-    "₹" + NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-    }.format(value)
+private fun txMoney(value: Double): String = Formatters.formatInr(value)
 
-private fun formatTimestamp(raw: String?): String {
-    if (raw.isNullOrBlank()) return "Recent"
-    return try {
-        // Handle ISO-8601 like 2026-10-27T03:20:00
-        val clean = raw.replace("Z", "").substringBefore(".")
-        val inFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        val outFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale("en", "IN"))
-        val date = inFormat.parse(clean)
-        if (date != null) outFormat.format(date) else raw
-    } catch (_: Exception) {
-        raw
-    }
-}
+private fun formatTimestamp(raw: String?): String = Formatters.formatTransactionDate(raw)
 
 @Composable
 fun TransactionsScreen(onBackClick: () -> Unit = {}) {
