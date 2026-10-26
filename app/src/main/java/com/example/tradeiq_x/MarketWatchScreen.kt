@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -340,12 +341,13 @@ fun MarketWatchScreen(
         }
 
         Text(
-            text = "Demo prices • Not live market data",
+            text = MarketConstants.NOTICE_DEMO_DATA,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 10.dp),
             fontSize = 11.sp,
-            color = MarketGrey
+            color = MarketGrey,
+            textAlign = TextAlign.Center
         )
     }
 }

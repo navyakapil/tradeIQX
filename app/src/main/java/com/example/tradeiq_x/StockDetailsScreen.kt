@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -168,7 +169,7 @@ fun StockDetailsScreen(
                 }
 
                 Text(
-                    text = "Illustrative chart · Simulated prices",
+                    text = "Illustrative chart · ${MarketConstants.NOTICE_DEMO_DATA}",
                     color = DetailsMuted,
                     fontSize = 11.sp
                 )
@@ -267,10 +268,11 @@ fun StockDetailsScreen(
         }
 
         Text(
-            text = "Practice trading with virtual money. " +
-                    "Displayed prices and chart movements are simulated.",
+            text = "Practice trading with virtual money · ${MarketConstants.NOTICE_DEMO_DATA}",
             color = DetailsMuted,
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(Modifier.height(8.dp))

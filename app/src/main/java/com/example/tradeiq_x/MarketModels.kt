@@ -18,6 +18,11 @@ object MarketConstants {
     const val CANDLE_COUNT_1W: Int = 7
     const val CANDLE_COUNT_1M: Int = 30
     const val CANDLE_COUNT_1Y: Int = 12
+
+    // User-facing market data status notices
+    const val NOTICE_DEMO_DATA: String = "Demo Mode · Simulated Market Data"
+    const val NOTICE_STALE_DATA: String = "Market Data Delayed · Last known prices"
+    const val NOTICE_LIVE_DATA: String = "Live Market Data · Real-time NSE"
 }
 
 /**
