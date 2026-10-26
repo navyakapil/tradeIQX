@@ -655,7 +655,7 @@ def get_current_user_profile(
 
 # AI Mentor imports
 import logging
-from rag_service import answer_question
+from rag_service import answer_question, generate_quiz
 
 logger = logging.getLogger(__name__)
 
@@ -693,6 +693,93 @@ def chat(data: ChatRequest):
             status_code=503,
             detail="AI Mentor is temporarily unavailable."
         ) from exc
+
+
+# ---------------------------------
+# AI QUIZ GENERATION
+# ---------------------------------
+
+class QuizGenerateRequest(BaseModel):
+    topic: str = "Stock Market Basics"
+    difficulty: str = "Beginner"
+
+
+FALLBACK_QUIZ_QUESTIONS = [
+    {
+        "question": "What does owning a share of stock represent?",
+        "options": [
+            "A loan made to the company",
+            "Fractional ownership in the corporation",
+            "A guaranteed dividend payment",
+            "A contract to purchase company products"
+        ],
+        "correct_index": 1,
+        "explanation": "A stock represents fractional ownership (equity) in a corporation."
+    },
+    {
+        "question": "What is the primary role of a stock exchange like the NSE?",
+        "options": [
+            "Setting daily stock price targets",
+            "Providing a regulated marketplace for buyers and sellers",
+            "Lending capital directly to private companies",
+            "Insuring investors against market losses"
+        ],
+        "correct_index": 1,
+        "explanation": "Stock exchanges provide a secure, transparent, and regulated marketplace to facilitate trading between buyers and sellers."
+    },
+    {
+        "question": "What does a 'Bull Market' signify in financial markets?",
+        "options": [
+            "A prolonged period of declining stock prices",
+            "A market where only institutional funds trade",
+            "A period of rising asset prices and investor confidence",
+            "A market closed due to volatility limits"
+        ],
+        "correct_index": 2,
+        "explanation": "A bull market refers to an economic condition characterized by rising stock prices and optimistic investor sentiment."
+    },
+    {
+        "question": "What is the purpose of diversification in an investment portfolio?",
+        "options": [
+            "Maximizing return by investing all funds in one stock",
+            "Reducing unsystematic risk by spreading capital across multiple assets",
+            "Eliminating all market risk completely",
+            "Avoiding capital gains taxes"
+        ],
+        "correct_index": 1,
+        "explanation": "Diversification spreads investments across various industries or asset classes to reduce company-specific risk."
+    },
+    {
+        "question": "What does a stop-loss order do?",
+        "options": [
+            "Guarantees that a stock will be sold at a profit",
+            "Automatically triggers a sell order when the price drops to a set level",
+            "Prevents a broker from charging transaction fees",
+            "Freezes trading on a stock for 24 hours"
+        ],
+        "correct_index": 1,
+        "explanation": "A stop-loss order is designed to limit an investor's loss on a position by executing a market or limit order once a designated trigger price is reached."
+    }
+]
+
+
+@app.post("/api/quiz/generate")
+def quiz_generate(data: QuizGenerateRequest):
+    topic = data.topic.strip() if data.topic else "Stock Market Basics"
+    difficulty = data.difficulty.strip() if data.difficulty else "Beginner"
+
+    try:
+        return generate_quiz(topic=topic, difficulty=difficulty)
+    except Exception as exc:
+        logger.warning("AI Quiz RAG generation failed, serving educational fallback: %s", exc)
+        return {
+            "topic": topic,
+            "difficulty": difficulty,
+            "questions": FALLBACK_QUIZ_QUESTIONS,
+            "total_questions": len(FALLBACK_QUIZ_QUESTIONS),
+            "sources": ["TradeIQX Educational Knowledge Base"],
+            "mode": "fallback_quiz"
+        }
 
 
 # ---------------------------------
