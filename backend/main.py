@@ -377,14 +377,22 @@ def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
             hashed_password=hash_password(user.password)
         )
 
-        db.add(new_user)
-
         try:
+            db.add(new_user)
+            db.flush()
+            initial_portfolio = Portfolio(
+                user_id=new_user.id,
+                cash_balance=100000.0
+            )
+            db.add(initial_portfolio)
             db.commit()
             db.refresh(new_user)
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Email or username already registered")
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=500, detail="Failed to initialize user account")
 
         return new_user
 
