@@ -9,18 +9,27 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
-from growwapi import GrowwAPI
-from growwapi.groww.exceptions import (
-    GrowwAPIAuthenticationException,
-    GrowwAPIAuthorisationException,
-    GrowwAPIException,
-    GrowwAPINotFoundException,
-    GrowwAPIRateLimitException,
-    GrowwAPITimeoutException,
-)
+try:
+    from growwapi import GrowwAPI
+    from growwapi.groww.exceptions import (
+        GrowwAPIAuthenticationException,
+        GrowwAPIAuthorisationException,
+        GrowwAPIException,
+        GrowwAPINotFoundException,
+        GrowwAPIRateLimitException,
+        GrowwAPITimeoutException,
+    )
+except ImportError:
+    GrowwAPI = None
+    class GrowwAPIException(Exception): pass
+    class GrowwAPIAuthenticationException(GrowwAPIException): pass
+    class GrowwAPIAuthorisationException(GrowwAPIException): pass
+    class GrowwAPINotFoundException(GrowwAPIException): pass
+    class GrowwAPIRateLimitException(GrowwAPIException): pass
+    class GrowwAPITimeoutException(GrowwAPIException): pass
 
 # Load .env relative to this file or current working directory
 _dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -118,7 +127,7 @@ def validate_history_range(raw_range: str) -> str:
 
 
 @lru_cache(maxsize=1)
-def get_groww_client() -> GrowwAPI:
+def get_groww_client():
     """Initializes and returns an authenticated singleton GrowwAPI client.
 
     Retrieves credentials from environment variables GROWW_API_KEY and
@@ -131,6 +140,8 @@ def get_groww_client() -> GrowwAPI:
         MarketProviderUnavailableError: If Groww API credentials are not set.
         MarketProviderAuthorisationError: If credentials fail authentication with 401/403.
     """
+    if GrowwAPI is None:
+        raise MarketProviderUnavailableError("Groww API library (growwapi) is not installed")
     api_key = os.getenv("GROWW_API_KEY")
     secret = os.getenv("GROWW_API_SECRET")
 

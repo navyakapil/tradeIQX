@@ -1,21 +1,69 @@
-
 package com.example.tradeiq_x
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+class BackendApiException(val statusCode: Int, message: String) : Exception(message)
+
 object BackendApi {
-    private const val BASE_URL = "http://10.0.2.2:8001"
+    @Volatile
+    var baseUrl: String = "http://10.0.2.2:8001"
+        private set
+
+    fun setBaseUrl(url: String) {
+        baseUrl = url.trimEnd('/')
+    }
+
+    private fun extractErrorMessage(response: String, statusCode: Int): String {
+        return try {
+            val json = JSONObject(response)
+            val detail = json.opt("detail")
+            when (detail) {
+                is String -> detail
+                is JSONArray -> {
+                    val messages = mutableListOf<String>()
+                    for (i in 0 until detail.length()) {
+                        val item = detail.optJSONObject(i)
+                        val msg = item?.optString("msg") ?: detail.optString(i)
+                        if (msg.isNotBlank()) messages.add(msg)
+                    }
+                    if (messages.isNotEmpty()) messages.joinToString("; ") else "Validation error ($statusCode)"
+                }
+                else -> defaultErrorMessage(statusCode)
+            }
+        } catch (_: Exception) {
+            defaultErrorMessage(statusCode)
+        }
+    }
+
+    private fun defaultErrorMessage(statusCode: Int): String {
+        return when (statusCode) {
+            400 -> "Bad request. Please verify your input."
+            401 -> "Invalid email or password."
+            404 -> "Requested resource not found."
+            409 -> "An account with this email or username already exists."
+            422 -> "Validation failed. Please check the entered fields."
+            500 -> "Internal server error. Please try again later."
+            503 -> "Backend service is temporarily unavailable."
+            else -> "Request failed with status $statusCode"
+        }
+    }
 
     private suspend fun post(
         endpoint: String,
-        data: JSONObject
+        data: JSONObject,
+        userId: Int? = null
     ): JSONObject = withContext(Dispatchers.IO) {
-        val connection = URL("$BASE_URL$endpoint")
-            .openConnection() as HttpURLConnection
+        val connection = try {
+            URL("$baseUrl$endpoint").openConnection() as HttpURLConnection
+        } catch (e: IOException) {
+            throw BackendApiException(0, "Unable to connect to server: ${e.localizedMessage ?: "Connection error"}")
+        }
 
         try {
             connection.requestMethod = "POST"
@@ -23,32 +71,78 @@ object BackendApi {
             connection.readTimeout = 10000
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
-
-            connection.outputStream.use {
-                it.write(data.toString().toByteArray(Charsets.UTF_8))
+            if (userId != null) {
+                connection.setRequestProperty("X-User-Id", userId.toString())
             }
 
-            val status = connection.responseCode
+            try {
+                connection.outputStream.use {
+                    it.write(data.toString().toByteArray(Charsets.UTF_8))
+                }
+            } catch (e: IOException) {
+                throw BackendApiException(0, "Failed to send data to server: ${e.localizedMessage ?: "Network error"}")
+            }
+
+            val status = try {
+                connection.responseCode
+            } catch (e: IOException) {
+                throw BackendApiException(0, "Unable to reach backend server. Please verify backend is running.")
+            }
+
             val stream = if (status in 200..299) {
                 connection.inputStream
             } else {
                 connection.errorStream
             }
 
-            val response = stream?.bufferedReader()?.use {
-                it.readText()
-            } ?: "{}"
+            val response = stream?.bufferedReader()?.use { it.readText() } ?: "{}"
 
             if (status !in 200..299) {
-                val message = try {
-                    JSONObject(response).optString(
-                        "detail",
-                        "Request failed: $status"
-                    )
-                } catch (_: Exception) {
-                    "Request failed: $status"
-                }
-                throw Exception(message)
+                val message = extractErrorMessage(response, status)
+                throw BackendApiException(status, message)
+            }
+
+            JSONObject(response)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private suspend fun get(
+        endpoint: String,
+        userId: Int? = null
+    ): JSONObject = withContext(Dispatchers.IO) {
+        val connection = try {
+            URL("$baseUrl$endpoint").openConnection() as HttpURLConnection
+        } catch (e: IOException) {
+            throw BackendApiException(0, "Unable to connect to server: ${e.localizedMessage ?: "Connection error"}")
+        }
+
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+            if (userId != null) {
+                connection.setRequestProperty("X-User-Id", userId.toString())
+            }
+
+            val status = try {
+                connection.responseCode
+            } catch (e: IOException) {
+                throw BackendApiException(0, "Unable to reach backend server. Please verify backend is running.")
+            }
+
+            val stream = if (status in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream
+            }
+
+            val response = stream?.bufferedReader()?.use { it.readText() } ?: "{}"
+
+            if (status !in 200..299) {
+                val message = extractErrorMessage(response, status)
+                throw BackendApiException(status, message)
             }
 
             JSONObject(response)
@@ -61,10 +155,9 @@ object BackendApi {
         email: String,
         password: String
     ): JSONObject = JSONObject().apply {
-        put("email", email)
+        put("email", email.trim().lowercase())
         put("password", password)
     }
-
 
     suspend fun signup(
         username: String,
@@ -73,12 +166,11 @@ object BackendApi {
     ): JSONObject {
         val data = JSONObject().apply {
             put("username", username.trim())
-            put("email", email.trim())
+            put("email", email.trim().lowercase())
             put("password", password)
         }
         return post("/auth/signup", data)
     }
-
 
     suspend fun login(
         email: String,
@@ -87,43 +179,46 @@ object BackendApi {
         return post("/auth/login", credentials(email, password))
     }
 
+    suspend fun getProfile(userId: Int? = null): JSONObject {
+        val endpoint = if (userId != null) "/auth/me?user_id=$userId" else "/auth/me"
+        return get(endpoint, userId)
+    }
+
     suspend fun getLiveQuote(symbol: String): JSONObject =
         withContext(Dispatchers.IO) {
             val safeSymbol = symbol.trim().uppercase()
-            require(safeSymbol.matches(Regex("[A-Z0-9]+"))) {
+            require(safeSymbol.matches(Regex("[A-Z0-9&-]+"))) {
                 "Invalid stock symbol"
             }
 
-            val connection = URL(
-                "$BASE_URL/market/quote/$safeSymbol"
-            ).openConnection() as HttpURLConnection
+            val connection = try {
+                URL("$baseUrl/market/quote/$safeSymbol").openConnection() as HttpURLConnection
+            } catch (e: IOException) {
+                throw BackendApiException(0, "Unable to connect to market quote service")
+            }
 
             try {
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 10000
                 connection.readTimeout = 15000
 
-                val status = connection.responseCode
+                val status = try {
+                    connection.responseCode
+                } catch (e: IOException) {
+                    throw BackendApiException(0, "Market service unreachable")
+                }
+
                 val stream = if (status in 200..299) {
                     connection.inputStream
                 } else {
                     connection.errorStream
                 }
 
-                val response = stream?.bufferedReader()?.use {
-                    it.readText()
-                } ?: "{}"
+                val response = stream?.bufferedReader()?.use { it.readText() } ?: "{}"
 
                 if (status !in 200..299) {
-                    val message = try {
-                        JSONObject(response).optString(
-                            "detail",
-                            "Quote request failed: $status"
-                        )
-                    } catch (_: Exception) {
-                        "Quote request failed: $status"
-                    }
-                    throw Exception(message)
+                    val message = extractErrorMessage(response, status)
+                    throw BackendApiException(status, message)
                 }
 
                 JSONObject(response)
@@ -131,6 +226,7 @@ object BackendApi {
                 connection.disconnect()
             }
         }
+
     suspend fun getHistory(symbol: String, range: String): JSONObject =
         withContext(Dispatchers.IO) {
             val safeSymbol = symbol.trim().uppercase()
@@ -139,36 +235,34 @@ object BackendApi {
             }
 
             val safeRange = range.trim().uppercase()
-            val connection = URL(
-                "$BASE_URL/market/history/$safeSymbol?range=$safeRange"
-            ).openConnection() as HttpURLConnection
+            val connection = try {
+                URL("$baseUrl/market/history/$safeSymbol?range=$safeRange").openConnection() as HttpURLConnection
+            } catch (e: IOException) {
+                throw BackendApiException(0, "Unable to connect to market history service")
+            }
 
             try {
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 10000
                 connection.readTimeout = 15000
 
-                val status = connection.responseCode
+                val status = try {
+                    connection.responseCode
+                } catch (e: IOException) {
+                    throw BackendApiException(0, "Market service unreachable")
+                }
+
                 val stream = if (status in 200..299) {
                     connection.inputStream
                 } else {
                     connection.errorStream
                 }
 
-                val response = stream?.bufferedReader()?.use {
-                    it.readText()
-                } ?: "{}"
+                val response = stream?.bufferedReader()?.use { it.readText() } ?: "{}"
 
                 if (status !in 200..299) {
-                    val message = try {
-                        JSONObject(response).optString(
-                            "detail",
-                            "History request failed: $status"
-                        )
-                    } catch (_: Exception) {
-                        "History request failed: $status"
-                    }
-                    throw Exception(message)
+                    val message = extractErrorMessage(response, status)
+                    throw BackendApiException(status, message)
                 }
 
                 JSONObject(response)

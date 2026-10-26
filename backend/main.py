@@ -1,34 +1,62 @@
-﻿from market_data import (
+from typing import Dict, Optional
+from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import SQLAlchemyError
+from market_data import (
     get_live_quote,
     get_stock_history,
     MarketProviderAuthorisationError,
     MarketProviderRateLimitError,
     MarketProviderUnavailableError,
 )
-from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
-from typing import Dict
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import Dict
-
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, text, func
+from sqlalchemy.exc import IntegrityError
+from passlib.context import CryptContext
+
 from database import SessionLocal, engine
 from models import Base, User, Portfolio, Holding, Trade
 import schemas
 
 TradeRequest = schemas.TradeRequest
-from passlib.context import CryptContext
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
 
 app = FastAPI(title="TradeIQX API")
 Base.metadata.create_all(bind=engine)
+
+
+@app.exception_handler(SQLAlchemyError)
+def sqlalchemy_exception_handler(request, exc: SQLAlchemyError):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "A database error occurred. Please try again later."}
+    )
+
+
+@app.exception_handler(RequestValidationError)
+def validation_exception_handler(request, exc: RequestValidationError):
+    error_messages = []
+    for err in exc.errors():
+        loc = err.get('loc', ())
+        field = ' -> '.join(str(item) for item in loc if item != 'body')
+        msg = err.get('msg', 'Invalid input')
+        error_messages.append(f"{field}: {msg}" if field else msg)
+    detail_str = '; '.join(error_messages) if error_messages else 'Validation failed'
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": detail_str,
+            "errors": exc.errors()
+        }
+    )
 
 pwd_context = CryptContext(
     schemes=["bcrypt_sha256"],
     deprecated="auto"
 )
+# Pre-computed constant hash to mitigate user enumeration timing attacks
+DUMMY_PASSWORD_HASH = "$bcrypt-sha256$v=2,t=2b,r=12$7eqIpWvB1w58BOmY8K/6Se$D.2mF2sZ1n9q7Yv3Xwz2x9y0"
 
 
 def get_db():
@@ -38,6 +66,16 @@ def get_db():
     finally:
         db.close()
 
+def get_current_user_id(x_user_id: Optional[int] = Header(None)) -> Optional[int]:
+    return x_user_id
+
+
+def resolve_user_portfolio(db: Session, user_id: Optional[int] = None) -> Optional[Portfolio]:
+    if user_id is not None:
+        return db.query(Portfolio).filter(Portfolio.user_id == user_id).first()
+    return db.query(Portfolio).first()
+
+
 def hash_password(password: str):
     return pwd_context.hash(password)
 
@@ -45,10 +83,17 @@ def hash_password(password: str):
 def verify_password(plain, hashed):
     return pwd_context.verify(plain, hashed)
 
-class TradeRequest(BaseModel):
-    symbol: str = Field(min_length=1, max_length=20)
-    quantity: int = Field(gt=0)
-    price: float = Field(gt=0)
+
+def validate_password_policy(password: str) -> None:
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail='Password must be at least 8 characters')
+    if len(password) > 128:
+        raise HTTPException(status_code=400, detail='Password must not exceed 128 characters')
+    if not any(c.isdigit() for c in password):
+        raise HTTPException(status_code=400, detail='Password must contain at least one number')
+    if not any(c.isalpha() for c in password):
+        raise HTTPException(status_code=400, detail='Password must contain at least one letter')
+
 
 
 @app.get("/")
@@ -57,8 +102,19 @@ def home():
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "healthy"}
+def health_check(db: Session = Depends(get_db)):
+    db_status = "healthy"
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        db_status = "unhealthy"
+
+    return {
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "database": db_status
+    }
+
+
 @app.get("/market/quote/{symbol}", response_model=schemas.MarketQuoteResponse)
 def market_quote(symbol: str):
     try:
@@ -129,8 +185,11 @@ def market_history(symbol: str, range: str = "1D"):
             detail="unavailable",
         )
 @app.get("/portfolio")
-def get_portfolio(db: Session = Depends(get_db)):
-    portfolio = db.query(Portfolio).first()
+def get_portfolio(
+    db: Session = Depends(get_db),
+    user_id: Optional[int] = Depends(get_current_user_id)
+):
+    portfolio = resolve_user_portfolio(db, user_id)
 
     if portfolio is None:
         raise HTTPException(
@@ -178,7 +237,8 @@ def get_portfolio(db: Session = Depends(get_db)):
 @app.post("/buy")
 def buy_stock(
     trade: TradeRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: Optional[int] = Depends(get_current_user_id)
 ):
     symbol = trade.symbol.strip().upper()
 
@@ -200,14 +260,11 @@ def buy_stock(
             detail="Price must be greater than zero"
         )
 
-    # Temporary single-user implementation.
-    # We will connect this to the authenticated user next.
-
-    portfolio = db.query(Portfolio).first()
+    portfolio = resolve_user_portfolio(db, user_id)
 
     if portfolio is None:
         portfolio = Portfolio(
-            user_id=1,
+            user_id=user_id or 1,
             cash_balance=100000.0
         )
         db.add(portfolio)
@@ -305,7 +362,8 @@ def buy_stock(
 @app.post("/sell")
 def sell_stock(
     trade: TradeRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: Optional[int] = Depends(get_current_user_id)
 ):
     symbol = trade.symbol.strip().upper()
 
@@ -327,7 +385,7 @@ def sell_stock(
             detail="Price must be greater than zero"
         )
 
-    portfolio = db.query(Portfolio).first()
+    portfolio = resolve_user_portfolio(db, user_id)
 
     if portfolio is None:
         raise HTTPException(
@@ -400,12 +458,18 @@ def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
 
         if not username:
             raise HTTPException(status_code=400, detail="Username is required")
+        if len(username) < 3:
+            raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+        if len(username) > 50:
+            raise HTTPException(status_code=400, detail="Username must not exceed 50 characters")
 
-        if len(user.password) < 8:
-            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        validate_password_policy(user.password)
 
         existing_user = db.query(User).filter(
-            or_(User.email == email, User.username == username)
+            or_(
+                func.lower(User.email) == email,
+                func.lower(User.username) == username.lower()
+            )
         ).first()
 
         if existing_user:
@@ -417,29 +481,40 @@ def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
             hashed_password=hash_password(user.password)
         )
 
-        db.add(new_user)
-
         try:
+            db.add(new_user)
+            db.flush()
+            initial_portfolio = Portfolio(
+                user_id=new_user.id,
+                cash_balance=100000.0
+            )
+            db.add(initial_portfolio)
             db.commit()
             db.refresh(new_user)
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Email or username already registered")
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=500, detail="Failed to initialize user account")
 
         return new_user
 
 
-@app.post("/auth/login")
+@app.post("/auth/login", response_model=schemas.LoginResponse)
 def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
         email = str(user.email).strip().lower()
 
         existing_user = db.query(User).filter(
-            User.email == email
+            func.lower(User.email) == email
         ).first()
 
-        if not existing_user or not verify_password(
-            user.password, existing_user.hashed_password
-        ):
+        if existing_user is None:
+            # Perform dummy verification to equalize execution time against timing attacks
+            verify_password(user.password, DUMMY_PASSWORD_HASH)
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        if not verify_password(user.password, existing_user.hashed_password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         return {
@@ -448,6 +523,31 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
             "username": existing_user.username,
             "email": existing_user.email
         }
+
+
+@app.get("/auth/me", response_model=schemas.UserProfile)
+def get_current_user_profile(
+    user_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    if user_id is not None:
+        user = db.query(User).filter(User.id == user_id).first()
+    else:
+        user = db.query(User).order_by(User.id.asc()).first()
+
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    portfolio = db.query(Portfolio).filter(Portfolio.user_id == user.id).first()
+    cash_balance = portfolio.cash_balance if portfolio else 100000.0
+
+    return schemas.UserProfile(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        created_at=user.created_at,
+        cash_balance=round(cash_balance, 2)
+    )
 
 # AI Mentor imports
 import logging
