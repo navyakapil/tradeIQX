@@ -201,6 +201,14 @@ def get_portfolio(
         Holding.user_id == portfolio.user_id
     ).all()
 
+    total_invested = round(
+        sum(
+            holding.quantity * holding.average_price
+            for holding in user_holdings
+        ),
+        2
+    )
+
     user_trades = (
         db.query(Trade)
         .filter(Trade.user_id == portfolio.user_id)
@@ -210,6 +218,7 @@ def get_portfolio(
 
     return {
         "cash_balance": round(portfolio.cash_balance, 2),
+        "total_invested": total_invested,
         "holdings": {
             holding.symbol: holding.quantity
             for holding in user_holdings
