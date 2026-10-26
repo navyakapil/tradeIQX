@@ -22,26 +22,31 @@ import kotlinx.coroutines.launch
 
 private val ChatGreen = Color(0xFF16A34A)
 private val ChatBackground = Color(0xFFF6F8FA)
-private val ChatText = Color(0xFF172033)
+private val ChatDark = Color(0xFF1E293B)
+private val ChatMuted = Color(0xFF64748B)
+private val ChatBorder = Color(0xFFE2E8F0)
 
-private data class ChatMessage(
+data class ChatMessage(
+    val id: String = java.util.UUID.randomUUID().toString(),
     val text: String,
-    val isUser: Boolean
+    val isUser: Boolean,
+    val sources: List<String> = emptyList(),
+    val isError: Boolean = false,
+    val failedPrompt: String? = null
 )
 
 @Composable
 fun ChatbotScreen(
     onBack: () -> Unit = {}
 ) {
-    // Controls navigation between chatbot and AI Quiz.
     var showQuiz by remember { mutableStateOf(false) }
 
     val messages = remember {
         mutableStateListOf(
             ChatMessage(
-                text = "Hi! I'm TradeIQX AI 👋\n\n" +
-                        "Ask me about stocks, market orders, stop-losses, " +
-                        "diversification, and risk management.",
+                text = "Hello! I am your TradeIQX AI Trading Mentor 👋\n\n" +
+                        "Ask me anything about stock market basics, market & limit orders, " +
+                        "stop-losses, diversification, or risk management.",
                 isUser = false
             )
         )
@@ -49,29 +54,32 @@ fun ChatbotScreen(
 
     var input by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var lastQuestion by remember { mutableStateOf("") }
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // Shared message sender used by both suggestions and the send button.
     val sendQuestion: (String) -> Unit = { rawQuestion ->
         val question = rawQuestion.trim()
-
         if (question.isNotEmpty() && !isLoading) {
-            messages.add(ChatMessage(question, true))
+            messages.add(ChatMessage(text = question, isUser = true))
             input = ""
             isLoading = true
-            errorMessage = null
+            lastQuestion = question
 
             scope.launch {
                 try {
-                    // Use the existing team AI service.
                     val answer = AIService.askMentor(question)
-                    messages.add(ChatMessage(answer, false))
+                    messages.add(ChatMessage(text = answer, isUser = false))
                 } catch (e: Exception) {
-                    errorMessage = "AI connection failed: " +
-                            (e.message ?: "Please try again.")
+                    messages.add(
+                        ChatMessage(
+                            text = "Could not reach AI mentor: ${e.message ?: "Connection error"}",
+                            isUser = false,
+                            isError = true,
+                            failedPrompt = question
+                        )
+                    )
                 } finally {
                     isLoading = false
                 }
@@ -79,128 +87,93 @@ fun ChatbotScreen(
         }
     }
 
-    LaunchedEffect(messages.size, isLoading, showQuiz) {
-        if (!showQuiz && messages.isNotEmpty()) {
-            // LazyColumn's first item is the top spacer.
-            val targetIndex = if (isLoading) messages.size + 1 else messages.size
-            listState.animateScrollToItem(targetIndex)
+    LaunchedEffect(messages.size, isLoading) {
+        if (messages.isNotEmpty()) {
+            val targetIndex = if (isLoading) messages.size else messages.size - 1
+            listState.animateScrollToItem(maxOf(0, targetIndex))
         }
     }
 
-    // AI QUIZ SCREEN
     if (showQuiz) {
-        QuizScreen(
-            onBack = { showQuiz = false }
-        )
+        QuizScreen(onBack = { showQuiz = false })
         return
     }
 
-    // CHATBOT SCREEN
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = ChatBackground
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
 
-            // HEADER
+            // TOP APP BAR
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
-                    .padding(
-                        horizontal = 16.dp,
-                        vertical = 14.dp
-                    ),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onBack) {
-                    Text(
-                        "‹ Back",
-                        color = ChatGreen,
-                        fontSize = 16.sp
-                    )
+                TextButton(
+                    onClick = onBack,
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("‹ Back", color = ChatGreen, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                Spacer(modifier = Modifier.size(8.dp))
+                Spacer(modifier = Modifier.size(6.dp))
 
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(40.dp)
                         .background(ChatGreen, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "AI",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("IQ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
 
                 Spacer(modifier = Modifier.size(10.dp))
 
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "TradeIQX AI",
-                        fontSize = 18.sp,
+                        "AI Trading Mentor",
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ChatText
+                        color = ChatDark
                     )
-
                     Text(
-                        "Your market learning assistant",
-                        fontSize = 12.sp,
-                        color = Color.Gray
+                        "RAG Powered • TradeIQX Knowledge",
+                        fontSize = 11.sp,
+                        color = ChatMuted
                     )
                 }
 
-                // AI QUIZ BUTTON
                 Button(
                     onClick = { showQuiz = true },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ChatGreen
-                    ),
-                    contentPadding = PaddingValues(
-                        horizontal = 10.dp,
-                        vertical = 6.dp
-                    )
+                    colors = ButtonDefaults.buttonColors(containerColor = ChatGreen),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text(
-                        "Take AI Quiz",
-                        color = Color.White,
-                        fontSize = 11.sp
-                    )
+                    Text("AI Quiz", color = Color.White, fontSize = 11.sp)
                 }
             }
 
-            HorizontalDivider(
-                color = Color(0xFFE5E7EB)
-            )
+            HorizontalDivider(color = ChatBorder)
 
-            // CHAT CONVERSATION
+            // MESSAGE LIST
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp),
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
+                item { Spacer(modifier = Modifier.height(6.dp)) }
 
-                items(messages) { message ->
+                items(messages, key = { it.id }) { message ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = if (message.isUser) {
-                            Arrangement.End
-                        } else {
-                            Arrangement.Start
-                        }
+                        horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start
                     ) {
                         Surface(
                             shape = RoundedCornerShape(
@@ -209,25 +182,59 @@ fun ChatbotScreen(
                                 bottomStart = if (message.isUser) 16.dp else 4.dp,
                                 bottomEnd = if (message.isUser) 4.dp else 16.dp
                             ),
-                            color = if (message.isUser) {
-                                ChatGreen
-                            } else {
-                                Color.White
+                            color = when {
+                                message.isUser -> ChatGreen
+                                message.isError -> Color(0xFFFEF2F2)
+                                else -> Color.White
                             },
+                            border = if (!message.isUser && !message.isError) {
+                                androidx.compose.foundation.BorderStroke(1.dp, ChatBorder)
+                            } else null,
                             shadowElevation = 1.dp,
-                            modifier = Modifier.fillMaxWidth(0.86f)
+                            modifier = Modifier.fillMaxWidth(0.88f)
                         ) {
-                            Text(
-                                text = message.text,
-                                color = if (message.isUser) {
-                                    Color.White
-                                } else {
-                                    ChatText
-                                },
-                                fontSize = 14.sp,
-                                lineHeight = 21.sp,
-                                modifier = Modifier.padding(14.dp)
-                            )
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = message.text,
+                                    color = when {
+                                        message.isUser -> Color.White
+                                        message.isError -> Color(0xFFDC2626)
+                                        else -> ChatDark
+                                    },
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp
+                                )
+
+                                if (message.sources.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        message.sources.forEach { src ->
+                                            Surface(
+                                                color = Color(0xFFDCFCE7),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = src,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = Color(0xFF15803D),
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (message.isError && message.failedPrompt != null) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    TextButton(
+                                        onClick = { sendQuestion(message.failedPrompt) },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("↻ Retry", color = Color(0xFFDC2626), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -235,136 +242,99 @@ fun ChatbotScreen(
                 if (isLoading) {
                     item {
                         Row(
-                            modifier = Modifier.padding(vertical = 8.dp),
+                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(16.dp),
                                 color = ChatGreen,
                                 strokeWidth = 2.dp
                             )
-
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "  TradeIQX AI is thinking...",
-                                color = Color.Gray,
+                                "Thinking… consulting TradeIQX knowledge base",
+                                color = ChatMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(6.dp)) }
+            }
+
+            // SUGGESTIONS CHIPS
+            if (messages.size == 1 && !isLoading) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        "Try asking:",
+                        color = ChatMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    val suggestions = listOf(
+                        "What is the difference between market and limit orders?",
+                        "What is a stop-loss and how does it protect me?",
+                        "Why should I diversify my portfolio?",
+                        "How much should I risk per trade?"
+                    )
+                    suggestions.forEach { suggestion ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { sendQuestion(suggestion) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color.White,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, ChatBorder)
+                        ) {
+                            Text(
+                                text = "💡 $suggestion",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                color = ChatDark,
                                 fontSize = 13.sp
                             )
                         }
                     }
                 }
-
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
             }
 
-            // SMART CHAT SUGGESTIONS
-            if (messages.size == 1 && !isLoading) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = 14.dp,
-                            vertical = 6.dp
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "Try asking",
-                        color = ChatText,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    val suggestions = listOf(
-                        "What is paper trading?",
-                        "Explain the P/E ratio",
-                        "How can I manage trading risk?"
-                    )
-
-                    suggestions.forEach { suggestion ->
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    sendQuestion(suggestion)
-                                },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            shadowElevation = 1.dp
-                        ) {
-                            Text(
-                                text = suggestion,
-                                modifier = Modifier.padding(
-                                    horizontal = 12.dp,
-                                    vertical = 10.dp
-                                ),
-                                color = ChatText,
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ERROR MESSAGE
-            errorMessage?.let { error ->
-                Text(
-                    text = error,
-                    color = Color(0xFFDC2626),
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(
-                        horizontal = 16.dp,
-                        vertical = 4.dp
-                    )
-                )
-            }
-
-            // MESSAGE INPUT
+            // INPUT ROW
             Surface(
                 color = Color.White,
-                shadowElevation = 8.dp
+                shadowElevation = 6.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(
-                            horizontal = 12.dp,
-                            vertical = 12.dp
-                        ),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        color = ChatBackground
+                        shape = RoundedCornerShape(22.dp),
+                        color = ChatBackground,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, ChatBorder)
                     ) {
                         BasicTextField(
                             value = input,
                             onValueChange = { input = it },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(
-                                    horizontal = 16.dp,
-                                    vertical = 14.dp
-                                ),
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             enabled = !isLoading,
                             singleLine = true,
-                            textStyle = TextStyle(
-                                color = ChatText,
-                                fontSize = 14.sp
-                            ),
-                            decorationBox = { innerTextField ->
+                            textStyle = TextStyle(color = ChatDark, fontSize = 14.sp),
+                            decorationBox = { inner ->
                                 Box {
                                     if (input.isEmpty()) {
-                                        Text(
-                                            "Ask about stocks...",
-                                            color = Color.Gray,
-                                            fontSize = 14.sp
-                                        )
+                                        Text("Ask a trading or investing question...", color = Color.Gray, fontSize = 14.sp)
                                     }
-
-                                    innerTextField()
+                                    inner()
                                 }
                             }
                         )
@@ -372,25 +342,18 @@ fun ChatbotScreen(
 
                     Spacer(modifier = Modifier.size(8.dp))
 
-                    // SEND MESSAGE
                     Button(
-                        onClick = {
-                            sendQuestion(input)
-                        },
+                        onClick = { sendQuestion(input) },
                         enabled = input.isNotBlank() && !isLoading,
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = ChatGreen
+                            containerColor = ChatGreen,
+                            disabledContainerColor = Color(0xFFCBD5E1)
                         ),
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(44.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text(
-                            "↑",
-                            color = Color.White,
-                            fontSize = 23.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("↑", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
