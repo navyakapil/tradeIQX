@@ -1,5 +1,9 @@
 package com.example.tradeiq_x
 
+/**
+ * In-memory simulated market repository providing deterministic mock quotes and
+ * mathematically generated historical candles for offline development and testing.
+ */
 class MockMarketRepository : MarketRepository {
 
     private val quotes = listOf(
@@ -37,10 +41,16 @@ class MockMarketRepository : MarketRepository {
         )
     )
 
+    /**
+     * Returns the full list of in-memory simulated stock quotes.
+     */
     override suspend fun getQuotes(): List<StockQuote> {
         return quotes
     }
 
+    /**
+     * Finds a simulated quote matching the given ticker symbol (case-insensitive).
+     */
     override suspend fun getQuote(
         symbol: String
     ): StockQuote? {
@@ -49,6 +59,10 @@ class MockMarketRepository : MarketRepository {
         }
     }
 
+    /**
+     * Generates a realistic synthetic time series of OHLCV candles based on sinusoidal
+     * variations around the stock's current price for the requested range.
+     */
     override suspend fun getHistory(
         symbol: String,
         range: ChartRange

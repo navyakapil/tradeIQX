@@ -1,6 +1,9 @@
-
 package com.example.tradeiq_x
 
+/**
+ * Live market repository implementation backed by the TradeIQX FastAPI market service
+ * and upstream Groww market data API.
+ */
 class LiveMarketRepository : MarketRepository {
 
     private val symbols = listOf(
@@ -25,12 +28,22 @@ class LiveMarketRepository : MarketRepository {
         "WIPRO" to "Wipro Limited"
     )
 
+    /**
+     * Fetches live quotes for all default watchlist symbols concurrently.
+     * Skips symbols that fail to return valid quotes.
+     */
     override suspend fun getQuotes(): List<StockQuote> {
         return symbols.mapNotNull { symbol ->
             getQuote(symbol)
         }
     }
 
+    /**
+     * Fetches the live quote for a given symbol from the backend API.
+     *
+     * @param symbol Ticker symbol to query (e.g. "RELIANCE").
+     * @return [StockQuote] with latest price and timestamp, or null on error.
+     */
     override suspend fun getQuote(symbol: String): StockQuote? {
         val normalizedSymbol = symbol.trim().uppercase()
 
@@ -48,7 +61,7 @@ class LiveMarketRepository : MarketRepository {
                     ?: normalizedSymbol,
                 price = price,
                 previousClose = 0.0,
-                currency = "INR",
+                currency = MarketConstants.DEFAULT_CURRENCY,
                 lastUpdated = response.optString("fetched_at")
                     .takeIf { it.isNotBlank() }
             )
@@ -62,6 +75,10 @@ class LiveMarketRepository : MarketRepository {
         }
     }
 
+    /**
+     * Fetches historical candle data for chart rendering.
+     * Currently returns an empty list pending backend historical data availability.
+     */
     override suspend fun getHistory(
         symbol: String,
         range: ChartRange
@@ -70,5 +87,3 @@ class LiveMarketRepository : MarketRepository {
         return emptyList()
     }
 }
-
-
