@@ -1,4 +1,3 @@
-
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.background
@@ -9,15 +8,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
 private val SellBg = Color(0xFF071522)
 private val SellCard = Color(0xFF132838)
 private val SellRed = Color(0xFFFF5364)
+private val SellGreen = Color(0xFF32D49A)
 private val SellText = Color(0xFFF8FAFC)
 private val SellMuted = Color(0xFF9FB0C0)
 
@@ -29,25 +31,37 @@ private fun sellMoney(value: Double): String =
 
 @Composable
 fun SellScreen(
-    symbol: String,
-    onBack: () -> Unit,
-    onOrderSuccess: () -> Unit = {}
+    symbol: String = "RELIANCE",
+    onBack: () -> Unit = {},
+    onOrderSuccess: () -> Unit = {},
+    price: Double = TradingStore.prices[symbol.uppercase()] ?: 1450.25
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(symbol) {
+        TradingStore.init(context)
+        TradingStore.refresh(context)
+    }
+
     val stock = symbol.uppercase()
-
-    var quantityText by remember(stock) {
-        mutableStateOf("1")
-    }
-
-    var localMessage by remember {
-        mutableStateOf("")
-    }
-
-    val price = TradingStore.prices[stock] ?: 0.0
+    val currentPrice = TradingStore.prices[stock] ?: price
     val owned = TradingStore.holdings[stock] ?: 0
+    val avgPrice = TradingStore.averagePrices[stock] ?: currentPrice
+
+    var quantityText by remember(stock, owned) {
+        mutableStateOf(if (owned > 0) "1" else "0")
+    }
+
+    var localMessage by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+
     val quantity = quantityText.toIntOrNull() ?: 0
-    val total = price * quantity
+    val total = currentPrice * quantity
+    val estimatedRealizedPnl = (currentPrice - avgPrice) * quantity
     val remaining = owned - quantity
+
+    val isQuantityValid = quantity > 0 && quantity <= owned
 
     Column(
         modifier = Modifier
@@ -81,7 +95,7 @@ fun SellScreen(
                 Text("CURRENT PRICE", color = SellMuted, fontSize = 12.sp)
 
                 Text(
-                    sellMoney(price),
+                    sellMoney(currentPrice),
                     color = SellText,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
@@ -112,9 +126,9 @@ fun SellScreen(
         ) {
             OutlinedButton(
                 onClick = {
-                    quantityText =
-                        (quantity - 1).coerceAtLeast(1).toString()
-                }
+                    quantityText = (quantity - 1).coerceAtLeast(1).toString()
+                },
+                enabled = !isSubmitting && owned > 0
             ) {
                 Text("−")
             }
@@ -122,12 +136,11 @@ fun SellScreen(
             OutlinedTextField(
                 value = quantityText,
                 onValueChange = {
-                    if (it.length <= 7 &&
-                        (it.isEmpty() || it.all(Char::isDigit))
-                    ) {
+                    if (it.length <= 7 && (it.isEmpty() || it.all(Char::isDigit))) {
                         quantityText = it
                     }
                 },
+                enabled = !isSubmitting && owned > 0,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 label = { Text("Shares") },
@@ -143,10 +156,9 @@ fun SellScreen(
 
             OutlinedButton(
                 onClick = {
-                    quantityText =
-                        (quantity + 1).coerceAtMost(owned).toString()
+                    quantityText = (quantity + 1).coerceAtMost(owned).toString()
                 },
-                enabled = quantity < owned
+                enabled = !isSubmitting && quantity < owned
             ) {
                 Text("+")
             }
@@ -161,6 +173,12 @@ fun SellScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 SellSummaryLine("Estimated proceeds", sellMoney(total))
+
+                SellSummaryLine(
+                    "Estimated Realized P&L",
+                    "${if (estimatedRealizedPnl >= 0) "+" else ""}${sellMoney(estimatedRealizedPnl)}"
+                )
+
                 SellSummaryLine(
                     "Shares after sale",
                     remaining.coerceAtLeast(0).toString()
@@ -169,23 +187,38 @@ fun SellScreen(
         }
 
         if (owned == 0) {
-            Text("You do not own any shares of $stock.", color = SellRed)
+            Text("You do not own any shares of $stock.", color = SellRed, fontSize = 13.sp)
+        } else if (quantity > owned) {
+            Text(
+                "Cannot sell more than owned ($owned shares).",
+                color = SellRed,
+                fontSize = 13.sp
+            )
         }
 
         if (localMessage.isNotBlank()) {
-            Text(localMessage, color = SellRed)
+            Text(
+                localMessage,
+                color = if (localMessage.contains("Sold", ignoreCase = true)) SellGreen else SellRed,
+                fontSize = 14.sp
+            )
         }
 
         Button(
             onClick = {
-                val success = TradingStore.sell(stock, quantity)
-                localMessage = TradingStore.message.value
-
-                if (success) onOrderSuccess()
+                scope.launch {
+                    isSubmitting = true
+                    val success = TradingStore.sellAsync(stock, quantity, context)
+                    localMessage = TradingStore.message.value
+                    isSubmitting = false
+                    if (success) {
+                        onOrderSuccess()
+                    }
+                }
             },
-            enabled = price > 0 &&
-                    quantity > 0 &&
-                    quantity <= owned,
+            enabled = !isSubmitting &&
+                    currentPrice > 0 &&
+                    isQuantityValid,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp),
@@ -195,7 +228,15 @@ fun SellScreen(
             ),
             shape = RoundedCornerShape(14.dp)
         ) {
-            Text("Confirm Sell Order", fontWeight = FontWeight.Bold)
+            if (isSubmitting) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("Confirm Sell Order", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
