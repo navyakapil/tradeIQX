@@ -1,7 +1,9 @@
 import json
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 _model = None
@@ -10,6 +12,10 @@ _chunks = None
 _embeddings = None
 
 KB_PATH = Path(__file__).resolve().parent / "tradeiqx_knowledge.json"
+CACHE_PATH = Path(__file__).resolve().parent / ".embeddings_cache.npy"
+
+DEFAULT_TOP_K = int(os.environ.get("RAG_TOP_K", "3"))
+DEFAULT_THRESHOLD = float(os.environ.get("RAG_THRESHOLD", "0.30"))
 
 
 def get_knowledge_base() -> List[Dict[str, Any]]:
@@ -39,10 +45,9 @@ def chunk_text(text: str, max_chars: int = 600, overlap: int = 100) -> List[str]
                 chunks.append(chunk)
             break
 
-        # Attempt to split on period or space
         split_pos = text.rfind(". ", start, end)
         if split_pos != -1 and split_pos >= start + (max_chars // 2):
-            split_pos += 1  # Include the period
+            split_pos += 1
         else:
             split_pos = text.rfind(" ", start, end)
             if split_pos == -1 or split_pos <= start:
@@ -74,7 +79,6 @@ def get_knowledge_chunks() -> List[Dict[str, Any]]:
                 chunk_entry["content"] = ch
                 chunk_entry["chunk_index"] = idx
                 chunk_entry["total_chunks"] = len(text_chunks)
-                # Context-enriched embedding text with topic metadata
                 kw_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
                 chunk_entry["embed_text"] = f"Topic: {topic}. Category: {category}. Keywords: {kw_str}. Content: {ch}"
                 chunks.append(chunk_entry)
@@ -91,47 +95,80 @@ def get_model():
 
 
 def get_embeddings():
+    """Returns knowledge base embeddings, loading from on-disk cache if available."""
     global _embeddings
     if _embeddings is None:
-        model = get_model()
         chunks = get_knowledge_chunks()
+        if CACHE_PATH.exists():
+            try:
+                cached = np.load(str(CACHE_PATH))
+                if len(cached) == len(chunks):
+                    _embeddings = cached
+                    return _embeddings
+            except Exception:
+                pass
+
+        model = get_model()
         texts = [chunk["embed_text"] for chunk in chunks]
         _embeddings = model.encode(texts, show_progress_bar=False)
+        try:
+            np.save(str(CACHE_PATH), _embeddings)
+        except Exception:
+            pass
     return _embeddings
 
 
-def semantic_search(query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+def semantic_search(query: str, top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+    k = top_k if top_k is not None else DEFAULT_TOP_K
     model = get_model()
     embeddings = get_embeddings()
     chunks = get_knowledge_chunks()
 
     query_embedding = model.encode([query])
     similarities = cosine_similarity(query_embedding, embeddings)[0]
-    top_indices = similarities.argsort()[::-1][:top_k]
+    top_indices = similarities.argsort()[::-1]
 
     results = []
+    seen_topics = set()
+
     for index in top_indices:
-        result = chunks[index].copy()
+        chunk = chunks[index]
+        topic = chunk.get("topic", "")
+        # Deduplicate by topic so results cover diverse relevant areas
+        if topic in seen_topics:
+            continue
+
+        result = chunk.copy()
         result["similarity"] = float(similarities[index])
         results.append(result)
+        seen_topics.add(topic)
+
+        if len(results) >= k:
+            break
 
     return results
 
 
 def smart_search(
     query: str,
-    threshold: float = 0.35,
-    top_k: int = 3
+    threshold: Optional[float] = None,
+    top_k: Optional[int] = None
 ) -> List[Dict[str, Any]]:
-    results = semantic_search(query, top_k=top_k)
-    return [result for result in results if result["similarity"] >= threshold]
+    min_score = threshold if threshold is not None else float(os.environ.get("RAG_THRESHOLD", str(DEFAULT_THRESHOLD)))
+    k = top_k if top_k is not None else int(os.environ.get("RAG_TOP_K", str(DEFAULT_TOP_K)))
+
+    # Fetch more candidates to ensure topic deduplication retains k quality matches
+    candidate_k = max(k * 3, 10)
+    results = semantic_search(query, top_k=candidate_k)
+    filtered = [result for result in results if result["similarity"] >= min_score]
+    return filtered[:k]
 
 
 def personalized_search(
     query: str,
     difficulty: Optional[str] = None,
-    threshold: float = 0.35,
-    top_k: int = 3
+    threshold: Optional[float] = None,
+    top_k: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     results = smart_search(query, threshold=threshold, top_k=top_k)
     if difficulty:
@@ -146,8 +183,8 @@ def personalized_search(
 
 def build_rag_context(
     query: str,
-    threshold: float = 0.35,
-    top_k: int = 3
+    threshold: Optional[float] = None,
+    top_k: Optional[int] = None
 ) -> str:
     results = smart_search(query, threshold=threshold, top_k=top_k)
     if not results:
@@ -169,20 +206,24 @@ def build_rag_context(
 
 def build_rag_context_with_scores(
     query: str,
-    threshold: float = 0.35,
-    top_k: int = 3
+    threshold: Optional[float] = None,
+    top_k: Optional[int] = None
 ) -> Dict[str, Any]:
     results = smart_search(query, threshold=threshold, top_k=top_k)
     if not results:
         return {
             "status": "no_match",
             "confidence": 0.0,
-            "context": ""
+            "context": "",
+            "sources": []
         }
 
     best_score = float(results[0]["similarity"])
     context_parts = []
+    sources = []
+
     for result in results:
+        sources.append(result["topic"])
         context_parts.append(
             f"Topic: {result['topic']}\n"
             f"Category: {result.get('category', 'Finance')}\n"
@@ -194,5 +235,6 @@ def build_rag_context_with_scores(
     return {
         "status": "success",
         "confidence": best_score,
-        "context": "\n\n---\n\n".join(context_parts)
+        "context": "\n\n---\n\n".join(context_parts),
+        "sources": sources
     }
