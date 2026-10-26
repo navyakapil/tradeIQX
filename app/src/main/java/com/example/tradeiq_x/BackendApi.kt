@@ -187,7 +187,7 @@ object BackendApi {
     suspend fun getLiveQuote(symbol: String): JSONObject =
         withContext(Dispatchers.IO) {
             val safeSymbol = symbol.trim().uppercase()
-            require(safeSymbol.matches(Regex("[A-Z0-9]+"))) {
+            require(safeSymbol.matches(Regex("[A-Z0-9&-]+"))) {
                 "Invalid stock symbol"
             }
 
@@ -195,6 +195,50 @@ object BackendApi {
                 URL("$baseUrl/market/quote/$safeSymbol").openConnection() as HttpURLConnection
             } catch (e: IOException) {
                 throw BackendApiException(0, "Unable to connect to market quote service")
+            }
+
+            try {
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 10000
+                connection.readTimeout = 15000
+
+                val status = try {
+                    connection.responseCode
+                } catch (e: IOException) {
+                    throw BackendApiException(0, "Market service unreachable")
+                }
+
+                val stream = if (status in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+                val response = stream?.bufferedReader()?.use { it.readText() } ?: "{}"
+
+                if (status !in 200..299) {
+                    val message = extractErrorMessage(response, status)
+                    throw BackendApiException(status, message)
+                }
+
+                JSONObject(response)
+            } finally {
+                connection.disconnect()
+            }
+        }
+
+    suspend fun getHistory(symbol: String, range: String): JSONObject =
+        withContext(Dispatchers.IO) {
+            val safeSymbol = symbol.trim().uppercase()
+            require(safeSymbol.matches(Regex("[A-Z0-9&-]+"))) {
+                "Invalid stock symbol"
+            }
+
+            val safeRange = range.trim().uppercase()
+            val connection = try {
+                URL("$baseUrl/market/history/$safeSymbol?range=$safeRange").openConnection() as HttpURLConnection
+            } catch (e: IOException) {
+                throw BackendApiException(0, "Unable to connect to market history service")
             }
 
             try {

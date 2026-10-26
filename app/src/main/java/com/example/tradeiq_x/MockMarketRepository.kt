@@ -1,6 +1,9 @@
-
 package com.example.tradeiq_x
 
+/**
+ * In-memory simulated market repository providing deterministic mock quotes and
+ * mathematically generated historical candles for offline development and testing.
+ */
 class MockMarketRepository : MarketRepository {
 
     private val quotes = listOf(
@@ -38,10 +41,16 @@ class MockMarketRepository : MarketRepository {
         )
     )
 
+    /**
+     * Returns the full list of in-memory simulated stock quotes.
+     */
     override suspend fun getQuotes(): List<StockQuote> {
         return quotes
     }
 
+    /**
+     * Finds a simulated quote matching the given ticker symbol (case-insensitive).
+     */
     override suspend fun getQuote(
         symbol: String
     ): StockQuote? {
@@ -50,23 +59,27 @@ class MockMarketRepository : MarketRepository {
         }
     }
 
+    /**
+     * Generates a realistic synthetic time series of OHLCV candles based on sinusoidal
+     * variations around the stock's current price for the requested range.
+     */
     override suspend fun getHistory(
         symbol: String,
         range: ChartRange
     ): List<PriceCandle> {
         val quote = getQuote(symbol) ?: return emptyList()
         val count = when (range) {
-            ChartRange.ONE_DAY -> 24
-            ChartRange.ONE_WEEK -> 7
-            ChartRange.ONE_MONTH -> 30
-            ChartRange.ONE_YEAR -> 12
+            ChartRange.ONE_DAY -> MarketConstants.CANDLE_COUNT_1D
+            ChartRange.ONE_WEEK -> MarketConstants.CANDLE_COUNT_1W
+            ChartRange.ONE_MONTH -> MarketConstants.CANDLE_COUNT_1M
+            ChartRange.ONE_YEAR -> MarketConstants.CANDLE_COUNT_1Y
         }
 
         val intervalMs = when (range) {
-            ChartRange.ONE_DAY -> 60L * 60 * 1000
-            ChartRange.ONE_WEEK -> 24L * 60 * 60 * 1000
-            ChartRange.ONE_MONTH -> 24L * 60 * 60 * 1000
-            ChartRange.ONE_YEAR -> 30L * 24 * 60 * 60 * 1000
+            ChartRange.ONE_DAY -> MarketConstants.MS_PER_HOUR
+            ChartRange.ONE_WEEK -> MarketConstants.MS_PER_DAY
+            ChartRange.ONE_MONTH -> MarketConstants.MS_PER_DAY
+            ChartRange.ONE_YEAR -> MarketConstants.MS_PER_MONTH
         }
 
         val now = System.currentTimeMillis()
@@ -92,5 +105,3 @@ class MockMarketRepository : MarketRepository {
         }
     }
 }
-
-

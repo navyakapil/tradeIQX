@@ -1,12 +1,7 @@
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+.idea/
 .DS_Store
 /build
 /captures
@@ -14,4 +9,12 @@
 .cxx
 local.properties
 
+# Python and Backend
+.env
+.env.*
+!.env.example
+.venv/
 backend/venv/
+__pycache__/
+*.py[cod]
+*.db

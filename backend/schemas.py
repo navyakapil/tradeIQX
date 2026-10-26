@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -63,3 +63,32 @@ class TradeRequest(BaseModel):
     symbol: str = Field(min_length=1, max_length=20)
     quantity: int = Field(gt=0)
     price: float = Field(gt=0)
+
+
+class MarketQuoteResponse(BaseModel):
+    symbol: str
+    price: float
+    currency: str = "INR"
+    source: str
+    fetched_at: str
+    freshness: str
+    previous_close: Optional[float] = None
+    change: Optional[float] = None
+    change_percent: Optional[float] = None
+    status: str = "LIVE"
+
+
+class CandleResponse(BaseModel):
+    timestamp: int
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int = 0
+
+
+class MarketHistoryResponse(BaseModel):
+    symbol: str
+    range: str
+    candles: List[CandleResponse]
+    status: str = "LIVE"

@@ -3,6 +3,13 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
+from market_data import (
+    get_live_quote,
+    get_stock_history,
+    MarketProviderAuthorisationError,
+    MarketProviderRateLimitError,
+    MarketProviderUnavailableError,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, text, func
@@ -11,7 +18,6 @@ from passlib.context import CryptContext
 
 from database import SessionLocal, engine
 from models import Base, User, Portfolio, Holding, Trade
-from market_data import get_live_quote
 import schemas
 
 TradeRequest = schemas.TradeRequest
@@ -107,33 +113,76 @@ def health_check(db: Session = Depends(get_db)):
         "status": "healthy" if db_status == "healthy" else "degraded",
         "database": db_status
     }
-@app.get("/market/quote/{symbol}")
+
+
+@app.get("/market/quote/{symbol}", response_model=schemas.MarketQuoteResponse)
 def market_quote(symbol: str):
     try:
         return get_live_quote(symbol)
-
+    except MarketProviderAuthorisationError:
+        raise HTTPException(
+            status_code=403,
+            detail="provider_unauthorised",
+        )
+    except MarketProviderRateLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail="rate_limited",
+        )
+    except MarketProviderUnavailableError:
+        raise HTTPException(
+            status_code=503,
+            detail="unavailable",
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
             detail=str(exc),
         )
-
-    except LookupError as exc:
+    except LookupError:
         raise HTTPException(
             status_code=404,
-            detail=str(exc),
+            detail="Stock quote not found for this symbol",
         )
-
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=str(exc),
-        )
-
     except Exception:
         raise HTTPException(
-            status_code=502,
-            detail="Market data provider request failed",
+            status_code=503,
+            detail="unavailable",
+        )
+
+@app.get("/market/history/{symbol}", response_model=schemas.MarketHistoryResponse)
+def market_history(symbol: str, range: str = "1D"):
+    try:
+        return get_stock_history(symbol=symbol, range_str=range)
+    except MarketProviderAuthorisationError:
+        raise HTTPException(
+            status_code=403,
+            detail="provider_unauthorised",
+        )
+    except MarketProviderRateLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail="rate_limited",
+        )
+    except MarketProviderUnavailableError:
+        raise HTTPException(
+            status_code=503,
+            detail="unavailable",
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+    except LookupError:
+        raise HTTPException(
+            status_code=404,
+            detail="Stock quote not found for this symbol",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="unavailable",
         )
 @app.get("/portfolio")
 def get_portfolio(

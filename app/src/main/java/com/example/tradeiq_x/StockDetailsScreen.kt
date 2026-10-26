@@ -1,37 +1,27 @@
-
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.text.NumberFormat
-import java.util.Locale
+import kotlinx.coroutines.CancellationException
 
 private val DetailsBg = Color(0xFF071522)
 private val DetailsCard = Color(0xFF132838)
-private val DetailsGreen = Color(0xFF32D49A)
-private val DetailsRed = Color(0xFFFF5364)
 private val DetailsWhite = Color(0xFFF8FAFC)
 private val DetailsMuted = Color(0xFF9FB0C0)
-
-private fun detailsMoney(value: Double): String {
-    return "₹" + NumberFormat.getNumberInstance(
-        Locale("en", "IN")
-    ).apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-    }.format(value)
-}
 
 @Composable
 fun StockDetailsScreen(
@@ -41,7 +31,39 @@ fun StockDetailsScreen(
     onBack: () -> Unit
 ) {
     val stock = symbol.uppercase()
-    val price = TradingStore.prices[stock] ?: 0.0
+    val fallbackPrice = TradingStore.prices[stock] ?: 0.0
+
+    // Selected chart range preserved across recomposition and device rotation
+    var selectedRange by rememberSaveable { mutableStateOf(ChartRange.ONE_DAY) }
+    var currentQuote by remember { mutableStateOf<StockQuote?>(null) }
+    var candles by remember { mutableStateOf<List<PriceCandle>>(emptyList()) }
+    var isMarketLoading by remember { mutableStateOf(false) }
+    var chartError by remember { mutableStateOf<String?>(null) }
+    var reloadTrigger by remember { mutableStateOf(0) }
+
+    // Automatically cancels previous in-flight coroutine if stock or range changes
+    LaunchedEffect(stock, selectedRange, reloadTrigger) {
+        isMarketLoading = true
+        chartError = null
+        try {
+            val fetchedQuote = MarketDataManager.repository.getQuote(stock)
+            val fetchedCandles = MarketDataManager.repository.getHistory(stock, selectedRange)
+            currentQuote = fetchedQuote
+            candles = fetchedCandles
+            if (fetchedCandles.isEmpty()) {
+                chartError = "Historical chart data unavailable for $stock"
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            chartError = "Failed to load chart data. Please try again."
+        } finally {
+            isMarketLoading = false
+        }
+    }
+
+    val price = currentQuote?.price ?: fallbackPrice
+    val lastUpdated = MarketFormatters.formatRelativeTime(currentQuote?.lastUpdated)
 
     val companyNames = mapOf(
         "RELIANCE" to "Reliance Industries Ltd.",
@@ -52,13 +74,7 @@ fun StockDetailsScreen(
 
     val company = companyNames[stock] ?: stock
 
-    // Illustrative movement only, not real market performance.
-    val sampleChange = when (stock) {
-        "TCS" -> 1.20
-        "INFY" -> 0.60
-        "HDFCBANK" -> -0.42
-        else -> 1.32
-    }
+    val displayChangePercent = currentQuote?.changePercent
 
     Column(
         modifier = Modifier
@@ -103,12 +119,31 @@ fun StockDetailsScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = stock,
-                    color = DetailsWhite,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                val stockStatus = MarketDataStatus.fromString(currentQuote?.status)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stock,
+                        color = DetailsWhite,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = stockStatus.badgeColor
+                    ) {
+                        Text(
+                            text = stockStatus.displayName,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = stockStatus.textColor
+                        )
+                    }
+                }
 
                 Text(
                     text = company,
@@ -119,62 +154,172 @@ fun StockDetailsScreen(
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    text = detailsMoney(price),
+                    text = MarketFormatters.formatInrPrice(price),
                     color = DetailsWhite,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
                 )
 
-                Text(
-                    text = "${if (sampleChange >= 0) "+" else ""}" +
-                            String.format(Locale.US, "%.2f%%", sampleChange),
-                    color = if (sampleChange >= 0)
-                        DetailsGreen else DetailsRed,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                if (displayChangePercent != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = MarketFormatters.formatPercentChange(displayChangePercent),
+                            color = MarketColors.darkChangeColor(displayChangePercent >= 0),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Text(
+                            text = "• $lastUpdated",
+                            color = DetailsMuted,
+                            fontSize = 13.sp
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Updated $lastUpdated",
+                        color = DetailsMuted,
+                        fontSize = 13.sp
+                    )
+                }
 
                 Spacer(Modifier.height(12.dp))
 
-                Text(
-                    text = "Price movement",
-                    color = DetailsMuted,
-                    fontSize = 14.sp
-                )
-
-                // Decorative chart bars; not historical market data.
-                val bars = listOf(
-                    12, 18, 14, 25, 21, 32, 27, 38, 31, 45, 39, 53
-                )
-
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    verticalAlignment = Alignment.Bottom
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    bars.forEachIndexed { index, height ->
-                        Box(
+                    Text(
+                        text = "Price movement",
+                        color = DetailsMuted,
+                        fontSize = 14.sp
+                    )
+
+                    Text(
+                        text = "Range: ${selectedRange.label}",
+                        color = DetailsMuted,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // Interactive range selector chips preserved across recomposition
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ChartRange.values().forEach { rangeOption ->
+                        val isSelected = selectedRange == rangeOption
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MarketColors.DarkGainGreen else Color(0xFF1E384D),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(height.dp)
-                                .background(
-                                    if (sampleChange >= 0)
-                                        DetailsGreen
-                                    else
-                                        DetailsRed,
-                                    RoundedCornerShape(
-                                        topStart = 3.dp,
-                                        topEnd = 3.dp
-                                    )
+                                .clickable { selectedRange = rangeOption }
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = rangeOption.label,
+                                    color = if (isSelected) Color(0xFF062017) else DetailsWhite,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
-                        )
+                            }
+                        }
                     }
                 }
 
+                Spacer(Modifier.height(4.dp))
+
+                // Chart container with loading, empty/error, and candle visualizer states
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        isMarketLoading -> {
+                            CircularProgressIndicator(
+                                color = MarketColors.DarkGainGreen,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        chartError != null || candles.isEmpty() -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = chartError ?: "Chart data unavailable for $stock",
+                                    color = DetailsMuted,
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                TextButton(
+                                    onClick = { reloadTrigger++ },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MarketColors.DarkGainGreen
+                                    )
+                                ) {
+                                    Text(
+                                        "Retry",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        else -> {
+                            val minPrice = candles.minOfOrNull { it.low } ?: 0.0
+                            val maxPrice = candles.maxOfOrNull { it.high } ?: 1.0
+                            val priceRange = (maxPrice - minPrice).takeIf { it > 0.0 } ?: 1.0
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                candles.forEach { candle ->
+                                    val barHeight = (((candle.close - minPrice) / priceRange) * 75 + 15)
+                                        .coerceIn(10.0, 95.0)
+                                    val isBarGain = candle.close >= candle.open
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(barHeight.dp)
+                                            .background(
+                                                MarketColors.darkChangeColor(isBarGain),
+                                                RoundedCornerShape(
+                                                    topStart = 3.dp,
+                                                    topEnd = 3.dp
+                                                )
+                                            )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val isHistoryDemo = (MarketDataManager.repository as? LiveMarketRepository)?.isLastHistoryDemo ?: true
+                val chartNotice = if (isHistoryDemo) {
+                    "Illustrative chart · ${MarketConstants.NOTICE_DEMO_DATA}"
+                } else {
+                    "Live chart · ${MarketConstants.NOTICE_LIVE_DATA}"
+                }
                 Text(
-                    text = "Illustrative chart · Simulated prices",
+                    text = chartNotice,
                     color = DetailsMuted,
                     fontSize = 11.sp
                 )
@@ -195,7 +340,7 @@ fun StockDetailsScreen(
         ) {
             DetailStatCard(
                 title = "Trading price",
-                value = detailsMoney(price),
+                value = MarketFormatters.formatInrPrice(price),
                 modifier = Modifier.weight(1f)
             )
 
@@ -212,7 +357,7 @@ fun StockDetailsScreen(
         ) {
             DetailStatCard(
                 title = "Avg. buy price",
-                value = detailsMoney(
+                value = MarketFormatters.formatInrPrice(
                     TradingStore.averagePrices[stock] ?: 0.0
                 ),
                 modifier = Modifier.weight(1f)
@@ -220,7 +365,7 @@ fun StockDetailsScreen(
 
             DetailStatCard(
                 title = "Virtual balance",
-                value = detailsMoney(TradingStore.balance.value),
+                value = MarketFormatters.formatInrPrice(TradingStore.balance.value),
                 modifier = Modifier.weight(1f)
             )
         }
@@ -240,7 +385,7 @@ fun StockDetailsScreen(
                     .height(54.dp),
                 shape = RoundedCornerShape(15.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DetailsGreen,
+                    containerColor = MarketColors.DarkGainGreen,
                     contentColor = Color(0xFF062017)
                 )
             ) {
@@ -260,7 +405,7 @@ fun StockDetailsScreen(
                     .height(54.dp),
                 shape = RoundedCornerShape(15.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DetailsRed,
+                    containerColor = MarketColors.DarkLossRed,
                     contentColor = Color.White
                 )
             ) {
@@ -273,10 +418,11 @@ fun StockDetailsScreen(
         }
 
         Text(
-            text = "Practice trading with virtual money. " +
-                    "Displayed prices and chart movements are simulated.",
+            text = "Practice trading with virtual money · ${MarketConstants.NOTICE_DEMO_DATA}",
             color = DetailsMuted,
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(Modifier.height(8.dp))
