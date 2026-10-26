@@ -1,4 +1,3 @@
-
 import os
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -7,6 +6,13 @@ from dotenv import load_dotenv
 from growwapi import GrowwAPI
 
 load_dotenv()
+
+DEFAULT_EXCHANGE_PREFIX = "NSE_"
+DEFAULT_CURRENCY = "INR"
+DEFAULT_SOURCE = "Groww"
+DEFAULT_FRESHNESS = "not_verified"
+GROWW_API_TIMEOUT_SECONDS = 10
+STALE_QUOTE_THRESHOLD_SECONDS = 60
 
 
 @lru_cache(maxsize=1)
@@ -31,7 +37,7 @@ def get_live_quote(symbol: str) -> dict:
         raise ValueError("Invalid stock symbol")
 
     client = get_groww_client()
-    trading_symbol = f"NSE_{symbol}"
+    trading_symbol = f"{DEFAULT_EXCHANGE_PREFIX}{symbol}"
 
     result = client.get_ltp(
         segment=client.SEGMENT_CASH,
@@ -46,7 +52,8 @@ def get_live_quote(symbol: str) -> dict:
     return {
         "symbol": symbol,
         "price": float(price),
-        "source": "Groww",
+        "currency": DEFAULT_CURRENCY,
+        "source": DEFAULT_SOURCE,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
-        "freshness": "not_verified",
+        "freshness": DEFAULT_FRESHNESS,
     }

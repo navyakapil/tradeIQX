@@ -1,10 +1,31 @@
 package com.example.tradeiq_x
+
+object MarketConstants {
+    const val STALE_THRESHOLD_MS: Long = 60_000L // 60 seconds
+    const val NETWORK_CONNECT_TIMEOUT_MS: Int = 10_000
+    const val NETWORK_READ_TIMEOUT_MS: Int = 15_000
+    const val DEFAULT_CURRENCY: String = "INR"
+    const val DEFAULT_EXCHANGE: String = "NSE"
+
+    // Time intervals in milliseconds
+    const val MS_PER_MINUTE: Long = 60_000L
+    const val MS_PER_HOUR: Long = 60L * MS_PER_MINUTE
+    const val MS_PER_DAY: Long = 24L * MS_PER_HOUR
+    const val MS_PER_MONTH: Long = 30L * MS_PER_DAY
+
+    // Candle counts for simulated chart ranges
+    const val CANDLE_COUNT_1D: Int = 24
+    const val CANDLE_COUNT_1W: Int = 7
+    const val CANDLE_COUNT_1M: Int = 30
+    const val CANDLE_COUNT_1Y: Int = 12
+}
+
 data class StockQuote(
     val symbol: String,
     val companyName: String,
     val price: Double,
     val previousClose: Double,
-    val currency: String = "INR",
+    val currency: String = MarketConstants.DEFAULT_CURRENCY,
     val lastUpdated: String? = null
 ) {
     val change: Double

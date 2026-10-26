@@ -1,4 +1,3 @@
-
 package com.example.tradeiq_x
 
 class MockMarketRepository : MarketRepository {
@@ -56,17 +55,17 @@ class MockMarketRepository : MarketRepository {
     ): List<PriceCandle> {
         val quote = getQuote(symbol) ?: return emptyList()
         val count = when (range) {
-            ChartRange.ONE_DAY -> 24
-            ChartRange.ONE_WEEK -> 7
-            ChartRange.ONE_MONTH -> 30
-            ChartRange.ONE_YEAR -> 12
+            ChartRange.ONE_DAY -> MarketConstants.CANDLE_COUNT_1D
+            ChartRange.ONE_WEEK -> MarketConstants.CANDLE_COUNT_1W
+            ChartRange.ONE_MONTH -> MarketConstants.CANDLE_COUNT_1M
+            ChartRange.ONE_YEAR -> MarketConstants.CANDLE_COUNT_1Y
         }
 
         val intervalMs = when (range) {
-            ChartRange.ONE_DAY -> 60L * 60 * 1000
-            ChartRange.ONE_WEEK -> 24L * 60 * 60 * 1000
-            ChartRange.ONE_MONTH -> 24L * 60 * 60 * 1000
-            ChartRange.ONE_YEAR -> 30L * 24 * 60 * 60 * 1000
+            ChartRange.ONE_DAY -> MarketConstants.MS_PER_HOUR
+            ChartRange.ONE_WEEK -> MarketConstants.MS_PER_DAY
+            ChartRange.ONE_MONTH -> MarketConstants.MS_PER_DAY
+            ChartRange.ONE_YEAR -> MarketConstants.MS_PER_MONTH
         }
 
         val now = System.currentTimeMillis()
@@ -92,5 +91,3 @@ class MockMarketRepository : MarketRepository {
         }
     }
 }
-
-
