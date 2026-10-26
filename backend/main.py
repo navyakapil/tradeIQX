@@ -385,16 +385,7 @@ def buy_stock(
             detail="Price must be greater than zero"
         )
 
-    portfolio = resolve_user_portfolio(db, user_id)
-
-    if portfolio is None:
-        portfolio = Portfolio(
-            user_id=user_id or 1,
-            cash_balance=100000.0
-        )
-        db.add(portfolio)
-        db.flush()
-
+    eff_user_id, account, portfolio = get_or_create_user_account(db, user_id)
     total_cost = round(trade.quantity * trade.price, 2)
 
     if total_cost > portfolio.cash_balance:
@@ -403,10 +394,24 @@ def buy_stock(
             detail="Insufficient virtual cash"
         )
 
+    # Record order first
+    client_oid = getattr(trade, "client_order_id", None)
+    order = Order(
+        user_id=eff_user_id,
+        client_order_id=client_oid,
+        side="BUY",
+        symbol=symbol,
+        quantity=trade.quantity,
+        price=trade.price,
+        status="EXECUTED"
+    )
+    db.add(order)
+    db.flush()
+
     holding = (
         db.query(Holding)
         .filter(
-            Holding.user_id == portfolio.user_id,
+            Holding.user_id == eff_user_id,
             Holding.symbol == symbol
         )
         .first()
@@ -414,40 +419,37 @@ def buy_stock(
 
     if holding is None:
         holding = Holding(
-            user_id=portfolio.user_id,
+            user_id=eff_user_id,
             symbol=symbol,
-            quantity=0,
-            average_price=0.0
+            quantity=trade.quantity,
+            average_price=round(trade.price, 2)
         )
         db.add(holding)
-        db.flush()
+    else:
+        old_quantity = holding.quantity
+        new_quantity = old_quantity + trade.quantity
+        new_avg = round(
+            ((old_quantity * holding.average_price) + (trade.quantity * trade.price)) / new_quantity,
+            2
+        )
+        holding.quantity = new_quantity
+        holding.average_price = new_avg
 
-    old_quantity = holding.quantity
-    new_quantity = old_quantity + trade.quantity
+    # Deduct cash
+    portfolio.cash_balance = round(portfolio.cash_balance - total_cost, 2)
+    account.cash = portfolio.cash_balance
 
-    holding.average_price = round(
-        (
-            old_quantity * holding.average_price
-            + trade.quantity * trade.price
-        ) / new_quantity,
-        2
-    )
-
-    holding.quantity = new_quantity
-    portfolio.cash_balance = round(
-        portfolio.cash_balance - total_cost,
-        2
-    )
-
+    # Record trade with order link and realized pnl 0.0
     transaction = Trade(
-        user_id=portfolio.user_id,
+        user_id=eff_user_id,
+        order_id=order.id,
         symbol=symbol,
         side="BUY",
         quantity=trade.quantity,
         price=trade.price,
-        total=total_cost
+        total=total_cost,
+        realized_pnl=0.0
     )
-
     db.add(transaction)
 
     try:
@@ -463,18 +465,21 @@ def buy_stock(
 
     holdings = (
         db.query(Holding)
-        .filter(Holding.user_id == portfolio.user_id)
+        .filter(Holding.user_id == eff_user_id)
         .all()
     )
 
     return {
         "message": "Paper trade completed",
+        "order_id": order.id,
         "transaction": {
+            "order_id": order.id,
             "symbol": symbol,
             "side": "BUY",
             "quantity": trade.quantity,
             "price": trade.price,
-            "total": total_cost
+            "total": total_cost,
+            "average_buy_price": holding.average_price
         },
         "portfolio": {
             "cash_balance": portfolio.cash_balance,
