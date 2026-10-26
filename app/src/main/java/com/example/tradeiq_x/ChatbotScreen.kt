@@ -69,12 +69,38 @@ fun ChatbotScreen(
 
             scope.launch {
                 try {
-                    val answer = AIService.askMentor(question)
-                    messages.add(ChatMessage(text = answer, isUser = false))
+                    val reqJson = org.json.JSONObject().apply {
+                        put("question", question)
+                        put("message", question)
+                    }
+                    when (val result = ApiClient.postJsonObject("/api/chat", reqJson)) {
+                        is ApiResult.Success -> {
+                            val obj = result.data
+                            val answer = if (obj.has("answer")) obj.getString("answer") else obj.optString("reply", "No response received.")
+                            val sourcesList = mutableListOf<String>()
+                            val sourcesArr = obj.optJSONArray("sources")
+                            if (sourcesArr != null) {
+                                for (i in 0 until sourcesArr.length()) {
+                                    sourcesList.add(sourcesArr.getString(i))
+                                }
+                            }
+                            messages.add(ChatMessage(text = answer, isUser = false, sources = sourcesList))
+                        }
+                        is ApiResult.Error -> {
+                            messages.add(
+                                ChatMessage(
+                                    text = "TradeIQX AI Mentor: ${result.message}",
+                                    isUser = false,
+                                    isError = true,
+                                    failedPrompt = question
+                                )
+                            )
+                        }
+                    }
                 } catch (e: Exception) {
                     messages.add(
                         ChatMessage(
-                            text = "Could not reach AI mentor: ${e.message ?: "Connection error"}",
+                            text = "Could not connect to AI Mentor: ${e.message ?: "Connection error"}",
                             isUser = false,
                             isError = true,
                             failedPrompt = question
