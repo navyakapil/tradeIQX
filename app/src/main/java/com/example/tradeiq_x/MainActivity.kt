@@ -1,8 +1,11 @@
+
 package com.example.tradeiq_x
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,64 +19,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.clickable
-import com.example.tradeiq_x.ui.AIChatbotScreen
 
 private val Green = Color(0xFF16A34A)
 private val DarkGreen = Color(0xFF15803D)
 private val Dark = Color(0xFF0F172A)
 private val Background = Color(0xFFF5F7FB)
 private val Grey = Color(0xFF64748B)
-private val Red = Color(0xFFDC2626)
-
-
 
 enum class AppScreen {
-    WELCOME,
-    LOGIN,
-    SIGNUP,
-    HOME,
-    MARKET_WATCH,
-    STOCK_DETAILS,
-    BUY,
-    SELL,
-    PORTFOLIO,
-    AI_CHATBOT,
-    TRANSACTIONS
+    WELCOME, LOGIN, SIGNUP, HOME, MARKET_WATCH,
+    STOCK_DETAILS, BUY, SELL, PORTFOLIO, TRANSACTIONS, CHATBOT
 }
 
-
-
-
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        android.util.Log.d("TradeIQX", "MainActivity onCreate")
-
         setContent {
             MaterialTheme {
                 TradeIQXApp()
             }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        android.util.Log.d("TradeIQX", "MainActivity onResume")
-    }
-
-    override fun onPause() {
-        android.util.Log.d("TradeIQX", "MainActivity onPause")
-        super.onPause()
-    }
 }
-
 
 @Composable
 fun TradeIQXApp() {
     var screen by remember { mutableStateOf(AppScreen.WELCOME) }
+    var selectedStock by remember { mutableStateOf("RELIANCE") }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -99,40 +71,51 @@ fun TradeIQXApp() {
                 onMarketWatch = { screen = AppScreen.MARKET_WATCH },
                 onPortfolio = { screen = AppScreen.PORTFOLIO },
                 onTransactions = { screen = AppScreen.TRANSACTIONS },
-                onAIChatbot = { screen = AppScreen.AI_CHATBOT }
+                onChatbot = { screen = AppScreen.CHATBOT }
             )
+
             AppScreen.MARKET_WATCH -> MarketWatchScreen(
-                onStockSelected = { screen = AppScreen.STOCK_DETAILS },
+                onStockSelected = { symbol ->
+                    selectedStock = symbol
+                    screen = AppScreen.STOCK_DETAILS
+                },
                 onBack = { screen = AppScreen.HOME }
             )
 
             AppScreen.STOCK_DETAILS -> StockDetailsScreen(
+                symbol = selectedStock,
                 onBuy = { screen = AppScreen.BUY },
                 onSell = { screen = AppScreen.SELL },
-                onBack = { screen = AppScreen.HOME }
+                onBack = { screen = AppScreen.MARKET_WATCH }
             )
 
             AppScreen.BUY -> BuyScreen(
+                symbol = selectedStock,
                 onBack = { screen = AppScreen.STOCK_DETAILS },
-                onSell = { screen = AppScreen.SELL }
+                onSell = { screen = AppScreen.SELL },
+                onOrderSuccess = { screen = AppScreen.PORTFOLIO }
             )
 
             AppScreen.SELL -> SellScreen(
-                onBack = { screen = AppScreen.STOCK_DETAILS }
+                symbol = selectedStock,
+                onBack = { screen = AppScreen.STOCK_DETAILS },
+                onOrderSuccess = { screen = AppScreen.PORTFOLIO }
             )
 
             AppScreen.PORTFOLIO -> PortfolioScreen(
-                onBackClick = { screen = AppScreen.HOME }
+                onBackClick = { screen = AppScreen.HOME },
+                onTransactionsClick = {
+                    screen = AppScreen.TRANSACTIONS
+                }
             )
 
             AppScreen.TRANSACTIONS -> TransactionsScreen(
-                onBackClick = { screen = AppScreen.HOME }
+                onBackClick = { screen = AppScreen.PORTFOLIO }
             )
 
-            AppScreen.AI_CHATBOT -> AIChatbotScreen(
+            AppScreen.CHATBOT -> ChatbotScreen(
                 onBack = { screen = AppScreen.HOME }
             )
-
         }
     }
 }
@@ -213,7 +196,6 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center
     ) {
         BrandHeader()
-
         Spacer(Modifier.height(32.dp))
 
         Text(
@@ -223,11 +205,7 @@ fun LoginScreen(
             color = Dark
         )
 
-        Text(
-            "Log in to continue paper trading",
-            color = Grey
-        )
-
+        Text("Log in to continue paper trading", color = Grey)
         Spacer(Modifier.height(28.dp))
 
         OutlinedTextField(
@@ -254,7 +232,7 @@ fun LoginScreen(
         Spacer(Modifier.height(24.dp))
 
         Button(
-            onClick = onLogin,
+            onClick = { onLogin() }, // DEMO MODE: skips backend login
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -267,14 +245,11 @@ fun LoginScreen(
         }
 
         TextButton(onClick = onSignUp) {
-            Text("New here? Create an account", color = DarkGreen)
+            Text(
+                "New here? Create an account",
+                color = DarkGreen
+            )
         }
-
-        Text(
-            "Demo only: login currently opens the dashboard.",
-            color = Grey,
-            fontSize = 12.sp
-        )
     }
 }
 
@@ -287,7 +262,6 @@ fun SignUpScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -297,7 +271,6 @@ fun SignUpScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         BrandHeader()
-
         Spacer(Modifier.height(24.dp))
 
         Text(
@@ -308,7 +281,6 @@ fun SignUpScreen(
         )
 
         Text("Start your paper-trading journey", color = Grey)
-
         Spacer(Modifier.height(24.dp))
 
         OutlinedTextField(
@@ -355,34 +327,10 @@ fun SignUpScreen(
             shape = RoundedCornerShape(12.dp)
         )
 
-        if (error.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            Text(error, color = Red, fontSize = 13.sp)
-        }
-
         Spacer(Modifier.height(20.dp))
 
         Button(
-            onClick = {
-                error = when {
-                    name.isBlank() || email.isBlank() ||
-                            password.isBlank() || confirmPassword.isBlank() ->
-                        "Please fill in all fields."
-
-                    !email.contains("@") ->
-                        "Enter a valid email address."
-
-                    password.length < 6 ->
-                        "Password must be at least 6 characters."
-
-                    password != confirmPassword ->
-                        "Passwords do not match."
-
-                    else -> ""
-                }
-
-                if (error.isEmpty()) onCreateAccount()
-            },
+            onClick = { onCreateAccount() }, // DEMO MODE: skips backend signup
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -395,7 +343,10 @@ fun SignUpScreen(
         }
 
         TextButton(onClick = onLogin) {
-            Text("Already have an account? Login", color = DarkGreen)
+            Text(
+                "Already have an account? Login",
+                color = DarkGreen
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -408,7 +359,7 @@ fun HomeScreen(
     onMarketWatch: () -> Unit,
     onPortfolio: () -> Unit,
     onTransactions: () -> Unit,
-    onAIChatbot: () -> Unit
+    onChatbot: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -422,10 +373,17 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("TradeIQX", color = Green, fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold)
-                Text("Welcome to your dashboard", color = Grey,
-                    fontSize = 13.sp)
+                Text(
+                    "TradeIQX",
+                    color = Green,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Welcome to your dashboard",
+                    color = Grey,
+                    fontSize = 13.sp
+                )
             }
 
             TextButton(onClick = onLogout) {
@@ -447,20 +405,23 @@ fun HomeScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Dark
-            )
+            colors = CardDefaults.cardColors(containerColor = Dark)
         ) {
             Column(Modifier.padding(22.dp)) {
                 Text("Available Virtual Balance", color = Color.LightGray)
                 Spacer(Modifier.height(8.dp))
+
                 Text(
-                    "₹10,00,000",
-                    color = Color.White,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "₹" + java.text.NumberFormat
+                        .getNumberInstance(java.util.Locale("en", "IN"))
+                        .format(TradingStore.balance.value),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
+
                 Spacer(Modifier.height(8.dp))
+
                 Text(
                     "Practice with virtual money",
                     color = Color(0xFF86EFAC)
@@ -504,8 +465,27 @@ fun HomeScreen(
             "Explore available shares",
             onClick = onMarketWatch
         )
-        QuickAccessCard("💼", "My Portfolio", "View your holdings",onClick = onPortfolio)
-        QuickAccessCard("↔", "Transactions", "Review your paper trades",onClick = onTransactions)
+
+        QuickAccessCard(
+            "💼",
+            "My Portfolio",
+            "View your holdings",
+            onClick = onPortfolio
+        )
+
+        QuickAccessCard(
+            "↔",
+            "Transactions",
+            "Review your paper trades",
+            onClick = onTransactions
+        )
+
+        QuickAccessCard(
+            "🤖",
+            "AI Chatbot",
+            "Ask questions about stocks and investing",
+            onClick = onChatbot
+        )
 
         QuickAccessCard(
             "✦",
@@ -532,12 +512,14 @@ fun BrandHeader() {
         fontSize = 48.sp,
         fontWeight = FontWeight.Bold
     )
+
     Text(
         "TradeIQX",
         color = Dark,
         fontSize = 30.sp,
         fontWeight = FontWeight.Bold
     )
+
     Text(
         "Learn. Practice. Trade Smarter.",
         color = Grey,
@@ -554,13 +536,12 @@ fun SummaryCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(Modifier.padding(14.dp)) {
             Text(title, color = Grey, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
+
             Text(
                 value,
                 color = Dark,
@@ -584,9 +565,7 @@ fun QuickAccessCard(
             .padding(vertical = 5.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(
             modifier = Modifier
@@ -596,6 +575,7 @@ fun QuickAccessCard(
         ) {
             Text(icon, fontSize = 25.sp)
             Spacer(Modifier.width(14.dp))
+
             Column {
                 Text(
                     title,
