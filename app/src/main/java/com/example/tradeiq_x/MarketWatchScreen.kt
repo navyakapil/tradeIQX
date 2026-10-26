@@ -45,7 +45,36 @@ fun MarketWatchScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
-    val lastUpdated = remember { MarketFormatters.formatRelativeTime(null) }
+    var refreshCount by remember { mutableStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var stocksList by remember { mutableStateOf(sampleStocks) }
+
+    val lastUpdated = remember(refreshCount) { MarketFormatters.formatRelativeTime(null) }
+
+    // Manual refresh action updates stock quotes from the market repository
+    LaunchedEffect(refreshCount) {
+        if (refreshCount > 0) {
+            isRefreshing = true
+            try {
+                val liveQuotes = MarketDataManager.repository.getQuotes()
+                if (liveQuotes.isNotEmpty()) {
+                    stocksList = liveQuotes.map { quote ->
+                        Stock(
+                            symbol = quote.symbol,
+                            name = quote.companyName,
+                            price = MarketFormatters.formatInrPrice(quote.price),
+                            change = MarketFormatters.formatPercentChange(quote.changePercent),
+                            isPositive = quote.change >= 0.0
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+                // Preserve current displayed quotes on network error
+            } finally {
+                isRefreshing = false
+            }
+        }
+    }
 
     val categories = listOf(
         "All",
@@ -54,7 +83,7 @@ fun MarketWatchScreen(
         "Top Losers"
     )
 
-    val filteredStocks = sampleStocks.filter { stock ->
+    val filteredStocks = stocksList.filter { stock ->
         val matchesSearch =
             stock.symbol.contains(searchQuery, ignoreCase = true) ||
                     stock.name.contains(searchQuery, ignoreCase = true)
@@ -101,6 +130,31 @@ fun MarketWatchScreen(
                     color = MarketGrey
                 )
             }
+
+            // Manual refresh action button with progress indicator
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .padding(2.dp),
+                    color = MarketColors.GainGreen,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                IconButton(
+                    onClick = { refreshCount++ },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Text(
+                        text = "↻",
+                        fontSize = 22.sp,
+                        color = MarketDark,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(4.dp))
 
             Text(
                 text = "📈",
