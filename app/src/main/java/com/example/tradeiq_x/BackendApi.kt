@@ -12,10 +12,10 @@ class BackendApiException(val statusCode: Int, message: String) : Exception(mess
 
 object BackendApi {
     @Volatile
-    var baseUrl: String = if (BuildConfig.DEBUG || BuildConfig.BACKEND_BASE_URL.isBlank()) {
-        "http://10.0.2.2:8001"
-    } else {
+    var baseUrl: String = if (BuildConfig.BACKEND_BASE_URL.isNotBlank()) {
         BuildConfig.BACKEND_BASE_URL.trimEnd('/')
+    } else {
+        "http://10.0.2.2:8001"
     }
         private set
 

@@ -24,7 +24,7 @@ android {
             "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    val releaseBackendUrl: String = run {
+    val configuredBackendUrl: String = run {
         val prop = project.findProperty("TRADEIQX_BACKEND_URL") as? String
         if (!prop.isNullOrBlank()) return@run prop
 
@@ -36,16 +36,17 @@ android {
                 ?: localProps.getProperty("TRADEIQX_BACKEND_URL")
             if (!fromLocal.isNullOrBlank()) return@run fromLocal
         }
-        "https://tradeiqx-backend-service.a.run.app"
+        ""
     }
 
     buildTypes {
         debug {
-            buildConfigField("String", "BACKEND_BASE_URL", "\"\"")
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$configuredBackendUrl\"")
         }
         release {
             isMinifyEnabled = false
-            buildConfigField("String", "BACKEND_BASE_URL", "\"$releaseBackendUrl\"")
+            val releaseUrl = configuredBackendUrl.ifBlank { "https://tradeiqx-backend-service.a.run.app" }
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$releaseUrl\"")
         }
     }
 
