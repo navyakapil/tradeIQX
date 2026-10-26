@@ -40,6 +40,25 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class LoginResponse(BaseModel):
+    message: str
+    user_id: int
+    username: str
+    email: EmailStr
+    token: Optional[str] = None
+
+
+class UserProfile(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    created_at: Optional[datetime] = None
+    cash_balance: float = 100000.0
+
+    class Config:
+        from_attributes = True
+
+
 class TradeRequest(BaseModel):
     symbol: str = Field(min_length=1, max_length=20)
     quantity: int = Field(gt=0)
