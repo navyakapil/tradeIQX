@@ -1,6 +1,7 @@
 from typing import Dict, Optional
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -24,6 +25,24 @@ def sqlalchemy_exception_handler(request, exc: SQLAlchemyError):
     return JSONResponse(
         status_code=500,
         content={"detail": "A database error occurred. Please try again later."}
+    )
+
+
+@app.exception_handler(RequestValidationError)
+def validation_exception_handler(request, exc: RequestValidationError):
+    error_messages = []
+    for err in exc.errors():
+        loc = err.get('loc', ())
+        field = ' -> '.join(str(item) for item in loc if item != 'body')
+        msg = err.get('msg', 'Invalid input')
+        error_messages.append(f"{field}: {msg}" if field else msg)
+    detail_str = '; '.join(error_messages) if error_messages else 'Validation failed'
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": detail_str,
+            "errors": exc.errors()
+        }
     )
 
 pwd_context = CryptContext(
