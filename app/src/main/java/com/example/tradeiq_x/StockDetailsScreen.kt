@@ -14,8 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.text.NumberFormat
-import java.util.Locale
 
 private val DetailsBg = Color(0xFF071522)
 private val DetailsCard = Color(0xFF132838)
@@ -23,15 +21,6 @@ private val DetailsGreen = Color(0xFF32D49A)
 private val DetailsRed = Color(0xFFFF5364)
 private val DetailsWhite = Color(0xFFF8FAFC)
 private val DetailsMuted = Color(0xFF9FB0C0)
-
-private fun detailsMoney(value: Double): String {
-    return "₹" + NumberFormat.getNumberInstance(
-        Locale("en", "IN")
-    ).apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-    }.format(value)
-}
 
 @Composable
 fun StockDetailsScreen(
@@ -120,7 +109,7 @@ fun StockDetailsScreen(
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    text = detailsMoney(price),
+                    text = MarketFormatters.formatInrPrice(price),
                     color = DetailsWhite,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
@@ -131,8 +120,7 @@ fun StockDetailsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "${if (sampleChange >= 0) "+" else ""}" +
-                                String.format(Locale.US, "%.2f%%", sampleChange),
+                        text = MarketFormatters.formatPercentChange(sampleChange),
                         color = if (sampleChange >= 0)
                             DetailsGreen else DetailsRed,
                         fontSize = 15.sp,
@@ -207,7 +195,7 @@ fun StockDetailsScreen(
         ) {
             DetailStatCard(
                 title = "Trading price",
-                value = detailsMoney(price),
+                value = MarketFormatters.formatInrPrice(price),
                 modifier = Modifier.weight(1f)
             )
 
@@ -224,7 +212,7 @@ fun StockDetailsScreen(
         ) {
             DetailStatCard(
                 title = "Avg. buy price",
-                value = detailsMoney(
+                value = MarketFormatters.formatInrPrice(
                     TradingStore.averagePrices[stock] ?: 0.0
                 ),
                 modifier = Modifier.weight(1f)
@@ -232,7 +220,7 @@ fun StockDetailsScreen(
 
             DetailStatCard(
                 title = "Virtual balance",
-                value = detailsMoney(TradingStore.balance.value),
+                value = MarketFormatters.formatInrPrice(TradingStore.balance.value),
                 modifier = Modifier.weight(1f)
             )
         }
