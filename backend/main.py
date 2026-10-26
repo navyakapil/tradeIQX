@@ -37,6 +37,17 @@ def verify_password(plain, hashed):
     return pwd_context.verify(plain, hashed)
 
 
+def validate_password_policy(password: str) -> None:
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail='Password must be at least 8 characters')
+    if len(password) > 128:
+        raise HTTPException(status_code=400, detail='Password must not exceed 128 characters')
+    if not any(c.isdigit() for c in password):
+        raise HTTPException(status_code=400, detail='Password must contain at least one number')
+    if not any(c.isalpha() for c in password):
+        raise HTTPException(status_code=400, detail='Password must contain at least one letter')
+
+
 
 @app.get("/")
 def home():
@@ -346,9 +357,12 @@ def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
 
         if not username:
             raise HTTPException(status_code=400, detail="Username is required")
+        if len(username) < 3:
+            raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+        if len(username) > 50:
+            raise HTTPException(status_code=400, detail="Username must not exceed 50 characters")
 
-        if len(user.password) < 8:
-            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        validate_password_policy(user.password)
 
         existing_user = db.query(User).filter(
             or_(User.email == email, User.username == username)
