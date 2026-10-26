@@ -1,4 +1,4 @@
-﻿from market_data import get_live_quote
+﻿from market_data import get_live_quote, get_stock_history
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Dict
@@ -53,33 +53,53 @@ def home():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
-@app.get("/market/quote/{symbol}")
+@app.get("/market/quote/{symbol}", response_model=schemas.MarketQuoteResponse)
 def market_quote(symbol: str):
     try:
         return get_live_quote(symbol)
 
-    except ValueError as exc:
+    except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=str(exc),
+            detail="Invalid stock symbol requested",
         )
 
-    except LookupError as exc:
+    except LookupError:
         raise HTTPException(
             status_code=404,
-            detail=str(exc),
+            detail="Stock quote not found for this symbol",
         )
 
-    except RuntimeError as exc:
+    except RuntimeError:
         raise HTTPException(
             status_code=503,
-            detail=str(exc),
+            detail="Market data service temporarily unavailable",
         )
 
     except Exception:
         raise HTTPException(
             status_code=502,
             detail="Market data provider request failed",
+        )
+
+@app.get("/market/history/{symbol}", response_model=schemas.MarketHistoryResponse)
+def market_history(symbol: str, range: str = "1D"):
+    try:
+        return get_stock_history(symbol=symbol, range_str=range)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+    except LookupError:
+        raise HTTPException(
+            status_code=404,
+            detail="Stock quote not found for this symbol",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to retrieve history from market provider",
         )
 @app.get("/portfolio")
 def get_portfolio(db: Session = Depends(get_db)):
