@@ -1,4 +1,5 @@
-from typing import Dict, Optional
+﻿from typing import Dict, Optional
+import math
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -187,27 +188,94 @@ def market_history(symbol: str, range: str = "1D"):
 @app.get("/portfolio")
 def get_portfolio(
     db: Session = Depends(get_db),
-    user_id: Optional[int] = Depends(get_current_user_id)
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
+
     portfolio = resolve_user_portfolio(db, user_id)
 
     if portfolio is None:
         raise HTTPException(
             status_code=404,
-            detail="No portfolio found. Please create a portfolio first."
+            detail="No portfolio found. Please create a portfolio first.",
         )
 
-    user_holdings = db.query(Holding).filter(
-        Holding.user_id == portfolio.user_id
-    ).all()
+    user_holdings = (
+        db.query(Holding)
+        .filter(Holding.user_id == portfolio.user_id)
+        .all()
+    )
 
     total_invested = round(
         sum(
             holding.quantity * holding.average_price
             for holding in user_holdings
         ),
-        2
+        2,
     )
+
+    # Calculate current market value.
+    market_value = 0.0
+    prices_available = True
+
+    for holding in user_holdings:
+
+        if holding.quantity <= 0:
+            continue
+
+        try:
+            quote = get_live_quote(holding.symbol)
+            current_price = float(quote["price"])
+
+            if (
+                not math.isfinite(current_price)
+                or current_price <= 0
+            ):
+                raise ValueError("Invalid market price")
+
+            market_value += (
+                holding.quantity * current_price
+            )
+
+        except (
+            MarketProviderAuthorisationError,
+            MarketProviderRateLimitError,
+            MarketProviderUnavailableError,
+            ValueError,
+            LookupError,
+            KeyError,
+            TypeError,
+        ):
+            prices_available = False
+            break
+
+    if prices_available:
+
+        market_value = round(market_value, 2)
+
+        unrealized_pnl = round(
+            market_value - total_invested,
+            2,
+        )
+
+        unrealized_pnl_percent = (
+            round(
+                unrealized_pnl / total_invested * 100,
+                2,
+            )
+            if total_invested > 0
+            else 0.0
+        )
+
+        total_portfolio_value = round(
+            portfolio.cash_balance + market_value,
+            2,
+        )
+
+    else:
+        market_value = None
+        unrealized_pnl = None
+        unrealized_pnl_percent = None
+        total_portfolio_value = None
 
     user_trades = (
         db.query(Trade)
@@ -217,14 +285,22 @@ def get_portfolio(
     )
 
     return {
-        "cash_balance": round(portfolio.cash_balance, 2),
+        "cash_balance": round(
+            portfolio.cash_balance, 2
+        ),
         "total_invested": total_invested,
+        "market_value": market_value,
+        "unrealized_pnl": unrealized_pnl,
+        "unrealized_pnl_percent": unrealized_pnl_percent,
+        "total_portfolio_value": total_portfolio_value,
         "holdings": {
             holding.symbol: holding.quantity
             for holding in user_holdings
         },
         "average_prices": {
-            holding.symbol: round(holding.average_price, 2)
+            holding.symbol: round(
+                holding.average_price, 2
+            )
             for holding in user_holdings
         },
         "transactions": [
@@ -236,12 +312,18 @@ def get_portfolio(
                 "total": trade.total,
                 "created_at": (
                     trade.created_at.isoformat()
-                    if trade.created_at else None
+                    if trade.created_at
+                    else None
                 ),
             }
             for trade in user_trades
         ],
     }
+
+
+# --------------------------------------------------
+# BUY STOCK
+# --------------------------------------------------
 
 @app.post("/buy")
 def buy_stock(
