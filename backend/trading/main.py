@@ -6,6 +6,12 @@ and persistent order/trade history.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from database import engine, Base
+from prices import get_stock_info
+from schemas import QuoteResponse
+
+# Initialize database schema on startup
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="TradeIQX Trading Engine",
@@ -30,3 +36,15 @@ def health_check():
         "status": "healthy",
         "service": "trading-engine",
     }
+
+
+@app.get("/quote/{symbol}", response_model=QuoteResponse)
+def get_quote(symbol: str):
+    """Returns server-authoritative price quote for a symbol."""
+    info = get_stock_info(symbol)
+    return QuoteResponse(
+        symbol=info["symbol"],
+        name=info["name"],
+        price=info["price"],
+        currency="INR",
+    )
