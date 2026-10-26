@@ -1,20 +1,17 @@
-﻿from market_data import get_live_quote
+from typing import Dict, Optional
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
-from typing import Dict
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import Dict
-
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
+from passlib.context import CryptContext
+
 from database import SessionLocal, engine
 from models import Base, User, Portfolio, Holding, Trade
+from market_data import get_live_quote
 import schemas
 
 TradeRequest = schemas.TradeRequest
-from passlib.context import CryptContext
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
 
 app = FastAPI(title="TradeIQX API")
 Base.metadata.create_all(bind=engine)
@@ -39,10 +36,6 @@ def hash_password(password: str):
 def verify_password(plain, hashed):
     return pwd_context.verify(plain, hashed)
 
-class TradeRequest(BaseModel):
-    symbol: str = Field(min_length=1, max_length=20)
-    quantity: int = Field(gt=0)
-    price: float = Field(gt=0)
 
 
 @app.get("/")
