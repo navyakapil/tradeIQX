@@ -4,12 +4,13 @@ Provides server-authoritative paper-trading execution, portfolio valuation,
 and persistent order/trade history.
 """
 
-from typing import List
-from fastapi import FastAPI, Depends, HTTPException
+from datetime import datetime
+from typing import List, Optional
+from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
-from models import Account, Holding
+from models import Account, Holding, Trade
 from prices import get_stock_info, get_server_price
 from schemas import (
     QuoteResponse,
@@ -17,6 +18,7 @@ from schemas import (
     OrderResponse,
     PortfolioSummary,
     HoldingResponse,
+    TradeResponse,
 )
 from deps import get_current_account
 from services import (
@@ -168,3 +170,52 @@ def get_portfolio(
         return_percent=return_pct,
         holdings=holding_views,
     )
+
+
+@app.get("/transactions", response_model=List[TradeResponse])
+def get_transactions(
+    symbol: Optional[str] = Query(None, description="Filter by stock ticker symbol"),
+    side: Optional[str] = Query(None, description="Filter by BUY or SELL"),
+    start_date: Optional[str] = Query(None, description="ISO format start date"),
+    end_date: Optional[str] = Query(None, description="ISO format end date"),
+    sort: Optional[str] = Query("newest", description="Sorting: newest, oldest, amount_high, amount_low"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+):
+    """Retrieves paginated, filtered, and sorted trade history for the user."""
+    query = db.query(Trade).filter(Trade.user_id == account.user_id)
+
+    if symbol and symbol.strip():
+        query = query.filter(Trade.symbol == symbol.strip().upper())
+
+    if side and side.strip():
+        query = query.filter(Trade.side == side.strip().upper())
+
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(Trade.executed_at >= start_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format. Use ISO format.")
+
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(Trade.executed_at <= end_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format. Use ISO format.")
+
+    # Sorting
+    if sort == "oldest":
+        query = query.order_by(Trade.executed_at.asc())
+    elif sort == "amount_high":
+        query = query.order_by(Trade.total_value.desc())
+    elif sort == "amount_low":
+        query = query.order_by(Trade.total_value.asc())
+    else:  # "newest" default
+        query = query.order_by(Trade.executed_at.desc())
+
+    trades = query.offset(offset).limit(limit).all()
+    return trades
