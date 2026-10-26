@@ -4,6 +4,7 @@ Provides access to live stock quotes and market data via the Groww API SDK.
 """
 
 import os
+import re
 from datetime import datetime, timezone
 from functools import lru_cache
 
@@ -18,6 +19,42 @@ DEFAULT_SOURCE = "Groww"
 DEFAULT_FRESHNESS = "not_verified"
 GROWW_API_TIMEOUT_SECONDS = 10
 STALE_QUOTE_THRESHOLD_SECONDS = 60
+
+SYMBOL_REGEX = re.compile(r"^[A-Z0-9&-]{1,20}$")
+
+
+def normalize_symbol(raw_symbol: str) -> str:
+    """Normalizes and validates a stock ticker symbol.
+
+    Strips whitespace, converts to uppercase, removes optional 'NSE:' / 'NSE_'
+    prefixes and '.NS' suffixes, and validates against allowed format.
+
+    Args:
+        raw_symbol: Input ticker string (e.g. 'reliance.ns', 'NSE_TCS', ' infy ').
+
+    Returns:
+        str: Cleaned uppercase symbol (e.g. 'RELIANCE', 'TCS', 'INFY').
+
+    Raises:
+        ValueError: If symbol is empty or contains invalid characters.
+    """
+    if not raw_symbol or not isinstance(raw_symbol, str):
+        raise ValueError("Stock symbol must be a non-empty string")
+
+    symbol = raw_symbol.strip().upper()
+
+    if symbol.startswith("NSE:") or symbol.startswith("NSE_"):
+        symbol = symbol[4:].strip()
+
+    if symbol.endswith(".NS"):
+        symbol = symbol[:-3].strip()
+
+    if not symbol or not SYMBOL_REGEX.match(symbol):
+        raise ValueError(
+            f"Invalid stock symbol '{raw_symbol}'. Must be 1-20 alphanumeric characters."
+        )
+
+    return symbol
 
 
 @lru_cache(maxsize=1)
@@ -69,11 +106,7 @@ def get_live_quote(symbol: str) -> dict:
         LookupError: If no valid price quote is returned by the upstream provider.
         RuntimeError: If upstream client authentication or connection fails.
     """
-    symbol = symbol.strip().upper()
-
-    if not symbol.isalnum() or not symbol:
-        raise ValueError("Invalid stock symbol")
-
+    symbol = normalize_symbol(symbol)
     trading_symbol = f"{DEFAULT_EXCHANGE_PREFIX}{symbol}"
 
     try:

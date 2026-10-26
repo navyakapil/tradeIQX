@@ -20,6 +20,25 @@ object MarketConstants {
     const val CANDLE_COUNT_1Y: Int = 12
 }
 
+/**
+ * Normalizes and validates a stock ticker symbol.
+ * Strips whitespace, converts to uppercase, removes 'NSE:' / 'NSE_' prefixes
+ * and '.NS' suffixes, and verifies the symbol is 1-20 alphanumeric characters.
+ */
+fun normalizeMarketSymbol(rawSymbol: String): String {
+    var symbol = rawSymbol.trim().uppercase()
+    if (symbol.startsWith("NSE:") || symbol.startsWith("NSE_")) {
+        symbol = symbol.substring(4).trim()
+    }
+    if (symbol.endsWith(".NS")) {
+        symbol = symbol.removeSuffix(".NS").trim()
+    }
+    require(symbol.isNotEmpty() && symbol.matches(Regex("^[A-Z0-9&-]{1,20}$"))) {
+        "Invalid stock symbol: $rawSymbol"
+    }
+    return symbol
+}
+
 data class StockQuote(
     val symbol: String,
     val companyName: String,

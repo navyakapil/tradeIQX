@@ -41,11 +41,15 @@ class LiveMarketRepository : MarketRepository {
     /**
      * Fetches the live quote for a given symbol from the backend API.
      *
-     * @param symbol Ticker symbol to query (e.g. "RELIANCE").
+     * @param symbol Ticker symbol to query (e.g. "RELIANCE", "TCS.NS", "NSE_INFY").
      * @return [StockQuote] with latest price and timestamp, or null on error.
      */
     override suspend fun getQuote(symbol: String): StockQuote? {
-        val normalizedSymbol = symbol.trim().uppercase()
+        val normalizedSymbol = try {
+            normalizeMarketSymbol(symbol)
+        } catch (_: IllegalArgumentException) {
+            return null
+        }
 
         return try {
             val response = BackendApi.getLiveQuote(normalizedSymbol)
