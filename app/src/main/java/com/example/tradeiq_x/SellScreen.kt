@@ -1,4 +1,3 @@
-
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.background
@@ -9,9 +8,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -34,21 +35,25 @@ fun SellScreen(
     onBack: () -> Unit,
     onOrderSuccess: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     val stock = symbol.uppercase()
+    var quantityText by remember(stock) { mutableStateOf("1") }
+    var statusMessage by remember { mutableStateOf("") }
+    var isError by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
-    var quantityText by remember(stock) {
-        mutableStateOf("1")
-    }
-
-    var localMessage by remember {
-        mutableStateOf("")
-    }
-
-    val price = TradingStore.prices[stock] ?: 0.0
+    val price = stockPrice ?: TradingStore.prices[stock] ?: 1000.0
     val owned = TradingStore.holdings[stock] ?: 0
     val quantity = quantityText.toIntOrNull() ?: 0
     val total = price * quantity
     val remaining = owned - quantity
+
+    LaunchedEffect(Unit) {
+        TradingStore.init(context)
+        TradingStore.refreshPortfolio(context)
+    }
 
     Column(
         modifier = Modifier
@@ -57,7 +62,7 @@ fun SellScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        TextButton(onClick = onBack) {
+        TextButton(onClick = onBack, enabled = !isSubmitting) {
             Text("‹ Back", color = SellText)
         }
 
@@ -69,7 +74,7 @@ fun SellScreen(
         )
 
         Text(
-            "Paper trading · Simulated price",
+            "Paper trading • Real-time backend sync",
             color = SellMuted,
             fontSize = 13.sp
         )
@@ -113,24 +118,23 @@ fun SellScreen(
         ) {
             OutlinedButton(
                 onClick = {
-                    quantityText =
-                        (quantity - 1).coerceAtLeast(1).toString()
-                }
+                    quantityText = (quantity - 1).coerceAtLeast(1).toString()
+                },
+                enabled = !isSubmitting
             ) {
-                Text("−")
+                Text("-", color = SellText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
 
             OutlinedTextField(
                 value = quantityText,
                 onValueChange = {
-                    if (it.length <= 7 &&
-                        (it.isEmpty() || it.all(Char::isDigit))
-                    ) {
+                    if (it.length <= 7 && (it.isEmpty() || it.all(Char::isDigit))) {
                         quantityText = it
                     }
                 },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
+                enabled = !isSubmitting,
                 label = { Text("Shares") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = SellText,
@@ -144,12 +148,11 @@ fun SellScreen(
 
             OutlinedButton(
                 onClick = {
-                    quantityText =
-                        (quantity + 1).coerceAtMost(owned).toString()
+                    quantityText = (quantity + 1).coerceAtMost(owned).toString()
                 },
-                enabled = quantity < owned
+                enabled = !isSubmitting && quantity < owned
             ) {
-                Text("+")
+                Text("+", color = SellText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -170,33 +173,56 @@ fun SellScreen(
         }
 
         if (owned == 0) {
-            Text("You do not own any shares of $stock.", color = SellRed)
+            Text("You do not own any shares of $stock.", color = SellRed, fontSize = 13.sp)
         }
 
-        if (localMessage.isNotBlank()) {
-            Text(localMessage, color = SellRed)
+        if (statusMessage.isNotBlank()) {
+            Text(
+                statusMessage,
+                color = if (isError) SellRed else Color(0xFF32D49A),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
 
         Button(
             onClick = {
-                val success = TradingStore.sell(stock, quantity)
-                localMessage = TradingStore.message.value
+                if (isSubmitting) return@Button
+                isSubmitting = true
+                statusMessage = ""
+                isError = false
 
-                if (success) onOrderSuccess()
+                scope.launch {
+                    val (success, msg) = TradingStore.executeSell(stock, quantity, price, context)
+                    isSubmitting = false
+                    statusMessage = msg
+                    isError = !success
+                    if (success) {
+                        kotlinx.coroutines.delay(400)
+                        onOrderSuccess()
+                    }
+                }
             },
-            enabled = price > 0 &&
-                    quantity > 0 &&
-                    quantity <= owned,
+            enabled = price > 0 && quantity > 0 && quantity <= owned && !isSubmitting,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = SellRed,
+                disabledContainerColor = Color(0xFF3A1C20),
                 contentColor = Color.White
             ),
             shape = RoundedCornerShape(14.dp)
         ) {
-            Text("Confirm Sell Order", fontWeight = FontWeight.Bold)
+            if (isSubmitting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("Confirm Sell Order", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

@@ -1,4 +1,3 @@
-
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.background
@@ -9,9 +8,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -35,14 +36,25 @@ fun BuyScreen(
     onSell: () -> Unit,
     onOrderSuccess: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var quantityText by remember(symbol) { mutableStateOf("1") }
-    var localMessage by remember { mutableStateOf("") }
+    var statusMessage by remember { mutableStateOf("") }
+    var isError by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     val stock = symbol.uppercase()
-    val price = TradingStore.prices[stock] ?: 0.0
+    val price = stockPrice ?: TradingStore.prices[stock] ?: 1000.0
     val quantity = quantityText.toIntOrNull() ?: 0
     val total = price * quantity
-    val remaining = TradingStore.balance.value - total
+    val currentBalance = TradingStore.balance.value
+    val remaining = currentBalance - total
+
+    LaunchedEffect(Unit) {
+        TradingStore.init(context)
+        TradingStore.refreshPortfolio(context)
+    }
 
     Column(
         modifier = Modifier
@@ -51,7 +63,7 @@ fun BuyScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        TextButton(onClick = onBack) {
+        TextButton(onClick = onBack, enabled = !isSubmitting) {
             Text("‹ Back", color = BuyText)
         }
 
@@ -63,7 +75,7 @@ fun BuyScreen(
         )
 
         Text(
-            "Paper trading · Simulated price",
+            "Paper trading • Real-time backend sync",
             color = BuyMuted,
             fontSize = 13.sp
         )
@@ -86,7 +98,7 @@ fun BuyScreen(
 
                 Text("Available virtual balance", color = BuyMuted)
                 Text(
-                    buyMoney(TradingStore.balance.value),
+                    buyMoney(currentBalance),
                     color = BuyGreen,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
@@ -107,22 +119,22 @@ fun BuyScreen(
             OutlinedButton(
                 onClick = {
                     quantityText = (quantity - 1).coerceAtLeast(1).toString()
-                }
+                },
+                enabled = !isSubmitting
             ) {
-                Text("−")
+                Text("-", color = BuyText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
 
             OutlinedTextField(
                 value = quantityText,
                 onValueChange = {
-                    if (it.length <= 7 &&
-                        (it.isEmpty() || it.all(Char::isDigit))
-                    ) {
+                    if (it.length <= 7 && (it.isEmpty() || it.all(Char::isDigit))) {
                         quantityText = it
                     }
                 },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
+                enabled = !isSubmitting,
                 label = { Text("Shares") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = BuyText,
@@ -137,9 +149,10 @@ fun BuyScreen(
             OutlinedButton(
                 onClick = {
                     quantityText = (quantity + 1).toString()
-                }
+                },
+                enabled = !isSubmitting
             ) {
-                Text("+")
+                Text("+", color = BuyText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -154,7 +167,6 @@ fun BuyScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 BuySummaryLine("Order amount", buyMoney(total))
-
                 BuySummaryLine(
                     "Balance after order",
                     buyMoney(remaining)
@@ -162,35 +174,59 @@ fun BuyScreen(
             }
         }
 
-        if (localMessage.isNotBlank()) {
-            Text(localMessage, color = BuyGreen)
+        if (statusMessage.isNotBlank()) {
+            Text(
+                statusMessage,
+                color = if (isError) Color(0xFFFF5364) else BuyGreen,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
 
         Button(
             onClick = {
-                val success = TradingStore.buy(stock, quantity)
-                localMessage = TradingStore.message.value
+                if (isSubmitting) return@Button
+                isSubmitting = true
+                statusMessage = ""
+                isError = false
 
-                if (success) onOrderSuccess()
+                scope.launch {
+                    val (success, msg) = TradingStore.executeBuy(stock, quantity, price, context)
+                    isSubmitting = false
+                    statusMessage = msg
+                    isError = !success
+                    if (success) {
+                        kotlinx.coroutines.delay(400)
+                        onOrderSuccess()
+                    }
+                }
             },
-            enabled = price > 0 &&
-                    quantity > 0 &&
-                    total <= TradingStore.balance.value,
+            enabled = price > 0 && quantity > 0 && total <= currentBalance && !isSubmitting,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = BuyGreen,
+                disabledContainerColor = Color(0xFF1E3A32),
                 contentColor = Color(0xFF062017)
             ),
             shape = RoundedCornerShape(14.dp)
         ) {
-            Text("Confirm Buy Order", fontWeight = FontWeight.Bold)
+            if (isSubmitting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = Color(0xFF062017),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("Confirm Buy Order", fontWeight = FontWeight.Bold)
+            }
         }
 
         OutlinedButton(
             onClick = onSell,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isSubmitting
         ) {
             Text("Go to Sell $stock", color = BuyText)
         }
