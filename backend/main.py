@@ -20,6 +20,7 @@ from passlib.context import CryptContext
 from database import SessionLocal, engine
 from models import Base, User, Account, Portfolio, Holding, Order, Trade
 import schemas
+from prices import get_current_price
 
 TradeRequest = schemas.TradeRequest
 
@@ -220,122 +221,90 @@ def market_history(symbol: str, range: str = "1D"):
             detail="unavailable",
         )
 @app.get("/portfolio")
+@app.get("/api/portfolio")
 def get_portfolio(
     db: Session = Depends(get_db),
     user_id: Optional[int] = Depends(get_current_user_id),
 ):
-
-    portfolio = resolve_user_portfolio(db, user_id)
-
-    if portfolio is None:
-        raise HTTPException(
-            status_code=404,
-            detail="No portfolio found. Please create a portfolio first.",
-        )
+    eff_user_id, account, portfolio = get_or_create_user_account(db, user_id)
 
     user_holdings = (
         db.query(Holding)
-        .filter(Holding.user_id == portfolio.user_id)
+        .filter(Holding.user_id == eff_user_id, Holding.quantity > 0)
+        .order_by(Holding.symbol.asc())
         .all()
     )
 
-    total_invested = round(
-        sum(
-            holding.quantity * holding.average_price
-            for holding in user_holdings
-        ),
-        2,
-    )
-
-    # Calculate current market value.
-    market_value = 0.0
-    prices_available = True
+    holdings_detail = []
+    total_invested = 0.0
+    total_current_value = 0.0
 
     for holding in user_holdings:
+        qty = holding.quantity
+        avg_price = round(holding.average_price, 2)
+        invested = round(qty * avg_price, 2)
+        curr_price = round(get_current_price(holding.symbol), 2)
+        curr_val = round(qty * curr_price, 2)
+        unrealized = round(curr_val - invested, 2)
+        ret_pct = round((unrealized / invested * 100.0), 2) if invested > 0 else 0.0
 
-        if holding.quantity <= 0:
-            continue
+        total_invested += invested
+        total_current_value += curr_val
 
-        try:
-            quote = get_live_quote(holding.symbol)
-            current_price = float(quote["price"])
+        holdings_detail.append({
+            "symbol": holding.symbol,
+            "quantity": qty,
+            "avg_price": avg_price,
+            "invested": invested,
+            "current_price": curr_price,
+            "current_value": curr_val,
+            "unrealized_pnl": unrealized,
+            "return_pct": ret_pct
+        })
 
-            if (
-                not math.isfinite(current_price)
-                or current_price <= 0
-            ):
-                raise ValueError("Invalid market price")
-
-            market_value += (
-                holding.quantity * current_price
-            )
-
-        except (
-            MarketProviderAuthorisationError,
-            MarketProviderRateLimitError,
-            MarketProviderUnavailableError,
-            ValueError,
-            LookupError,
-            KeyError,
-            TypeError,
-        ):
-            prices_available = False
-            break
-
-    if prices_available:
-
-        market_value = round(market_value, 2)
-
-        unrealized_pnl = round(
-            market_value - total_invested,
-            2,
-        )
-
-        unrealized_pnl_percent = (
-            round(
-                unrealized_pnl / total_invested * 100,
-                2,
-            )
-            if total_invested > 0
-            else 0.0
-        )
-
-        total_portfolio_value = round(
-            portfolio.cash_balance + market_value,
-            2,
-        )
-
-    else:
-        market_value = None
-        unrealized_pnl = None
-        unrealized_pnl_percent = None
-        total_portfolio_value = None
+    total_invested = round(total_invested, 2)
+    total_current_value = round(total_current_value, 2)
+    unrealized_pnl = round(total_current_value - total_invested, 2)
+    overall_return_pct = (
+        round((unrealized_pnl / total_invested * 100.0), 2)
+        if total_invested > 0
+        else 0.0
+    )
 
     user_trades = (
         db.query(Trade)
-        .filter(Trade.user_id == portfolio.user_id)
+        .filter(Trade.user_id == eff_user_id)
         .order_by(Trade.created_at.desc())
         .all()
     )
 
+    realized_pnl = round(
+        sum(trade.realized_pnl for trade in user_trades if trade.realized_pnl is not None),
+        2
+    )
+    total_pnl = round(realized_pnl + unrealized_pnl, 2)
+    cash = round(portfolio.cash_balance, 2)
+    portfolio_value = round(cash + total_current_value, 2)
+
     return {
-        "cash_balance": round(
-            portfolio.cash_balance, 2
-        ),
+        "cash": cash,
+        "cash_balance": cash,
         "total_invested": total_invested,
-        "market_value": market_value,
+        "current_value": total_current_value,
+        "market_value": total_current_value,
+        "portfolio_value": portfolio_value,
+        "total_portfolio_value": portfolio_value,
         "unrealized_pnl": unrealized_pnl,
-        "unrealized_pnl_percent": unrealized_pnl_percent,
-        "total_portfolio_value": total_portfolio_value,
+        "unrealized_pnl_percent": overall_return_pct,
+        "realized_pnl": realized_pnl,
+        "total_pnl": total_pnl,
+        "return_pct": overall_return_pct,
+        "holdings_detail": holdings_detail,
         "holdings": {
-            holding.symbol: holding.quantity
-            for holding in user_holdings
+            h["symbol"]: h["quantity"] for h in holdings_detail
         },
         "average_prices": {
-            holding.symbol: round(
-                holding.average_price, 2
-            )
-            for holding in user_holdings
+            h["symbol"]: h["avg_price"] for h in holdings_detail
         },
         "transactions": [
             {
@@ -344,6 +313,7 @@ def get_portfolio(
                 "quantity": trade.quantity,
                 "price": trade.price,
                 "total": trade.total,
+                "realized_pnl": trade.realized_pnl,
                 "created_at": (
                     trade.created_at.isoformat()
                     if trade.created_at
@@ -353,11 +323,6 @@ def get_portfolio(
             for trade in user_trades
         ],
     }
-
-
-# --------------------------------------------------
-# BUY STOCK
-# --------------------------------------------------
 
 KNOWN_SYMBOLS = {
     "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
