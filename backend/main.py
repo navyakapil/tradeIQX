@@ -1,4 +1,4 @@
-﻿from typing import Dict, Optional
+from typing import Dict, Optional
 import math
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
@@ -570,7 +570,7 @@ def sell_stock(
             "price": trade.price,
             "total": total_value
         },
-        "portfolio": get_portfolio(db)
+        "portfolio": get_portfolio(db, user_id=portfolio.user_id)
     }
 @app.post("/auth/signup", response_model=schemas.UserResponse, status_code=201)
 def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
