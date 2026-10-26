@@ -18,3 +18,5 @@ backend/venv/
 __pycache__/
 *.py[cod]
 *.db
+trading.db
+backend/trading/trading.db
