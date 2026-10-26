@@ -6,6 +6,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 _model = None
 _knowledge_base = None
+_chunks = None
 _embeddings = None
 
 KB_PATH = Path(__file__).resolve().parent / "tradeiqx_knowledge.json"
@@ -21,6 +22,66 @@ def get_knowledge_base() -> List[Dict[str, Any]]:
     return _knowledge_base
 
 
+def chunk_text(text: str, max_chars: int = 600, overlap: int = 100) -> List[str]:
+    """Splits text longer than max_chars with overlap at sentence or word boundaries."""
+    if len(text) <= max_chars:
+        return [text]
+
+    chunks = []
+    start = 0
+    text_len = len(text)
+
+    while start < text_len:
+        end = start + max_chars
+        if end >= text_len:
+            chunk = text[start:].strip()
+            if chunk:
+                chunks.append(chunk)
+            break
+
+        # Attempt to split on period or space
+        split_pos = text.rfind(". ", start, end)
+        if split_pos != -1 and split_pos >= start + (max_chars // 2):
+            split_pos += 1  # Include the period
+        else:
+            split_pos = text.rfind(" ", start, end)
+            if split_pos == -1 or split_pos <= start:
+                split_pos = end
+
+        chunk = text[start:split_pos].strip()
+        if chunk:
+            chunks.append(chunk)
+        start = max(start + 1, split_pos - overlap)
+
+    return chunks if chunks else [text]
+
+
+def get_knowledge_chunks() -> List[Dict[str, Any]]:
+    """Chunks knowledge base entries longer than ~600 chars with metadata preservation."""
+    global _chunks
+    if _chunks is None:
+        kb = get_knowledge_base()
+        chunks = []
+        for item in kb:
+            content = item.get("content", "").strip()
+            topic = item.get("topic", "")
+            category = item.get("category", "")
+            keywords = item.get("keywords", [])
+            text_chunks = chunk_text(content, max_chars=600, overlap=100)
+
+            for idx, ch in enumerate(text_chunks):
+                chunk_entry = item.copy()
+                chunk_entry["content"] = ch
+                chunk_entry["chunk_index"] = idx
+                chunk_entry["total_chunks"] = len(text_chunks)
+                # Context-enriched embedding text with topic metadata
+                kw_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
+                chunk_entry["embed_text"] = f"Topic: {topic}. Category: {category}. Keywords: {kw_str}. Content: {ch}"
+                chunks.append(chunk_entry)
+        _chunks = chunks
+    return _chunks
+
+
 def get_model():
     global _model
     if _model is None:
@@ -33,8 +94,8 @@ def get_embeddings():
     global _embeddings
     if _embeddings is None:
         model = get_model()
-        kb = get_knowledge_base()
-        texts = [item["content"] for item in kb]
+        chunks = get_knowledge_chunks()
+        texts = [chunk["embed_text"] for chunk in chunks]
         _embeddings = model.encode(texts, show_progress_bar=False)
     return _embeddings
 
@@ -42,7 +103,7 @@ def get_embeddings():
 def semantic_search(query: str, top_k: int = 3) -> List[Dict[str, Any]]:
     model = get_model()
     embeddings = get_embeddings()
-    kb = get_knowledge_base()
+    chunks = get_knowledge_chunks()
 
     query_embedding = model.encode([query])
     similarities = cosine_similarity(query_embedding, embeddings)[0]
@@ -50,7 +111,7 @@ def semantic_search(query: str, top_k: int = 3) -> List[Dict[str, Any]]:
 
     results = []
     for index in top_indices:
-        result = kb[index].copy()
+        result = chunks[index].copy()
         result["similarity"] = float(similarities[index])
         results.append(result)
 
