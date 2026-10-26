@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
 fun TradeIQXApp() {
     var screen by remember { mutableStateOf(AppScreen.WELCOME) }
     var selectedStock by remember { mutableStateOf("RELIANCE") }
+    var selectedStockPrice by remember { mutableStateOf<Double?>(null) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -86,13 +87,20 @@ fun TradeIQXApp() {
 
             AppScreen.STOCK_DETAILS -> StockDetailsScreen(
                 symbol = selectedStock,
-                onBuy = { screen = AppScreen.BUY },
-                onSell = { screen = AppScreen.SELL },
+                onBuy = {
+                    selectedStockPrice = TradingStore.prices[selectedStock.uppercase()]
+                    screen = AppScreen.BUY
+                },
+                onSell = {
+                    selectedStockPrice = TradingStore.prices[selectedStock.uppercase()]
+                    screen = AppScreen.SELL
+                },
                 onBack = { screen = AppScreen.MARKET_WATCH }
             )
 
             AppScreen.BUY -> BuyScreen(
                 symbol = selectedStock,
+                stockPrice = selectedStockPrice,
                 onBack = { screen = AppScreen.STOCK_DETAILS },
                 onSell = { screen = AppScreen.SELL },
                 onOrderSuccess = { screen = AppScreen.PORTFOLIO }
@@ -100,6 +108,7 @@ fun TradeIQXApp() {
 
             AppScreen.SELL -> SellScreen(
                 symbol = selectedStock,
+                stockPrice = selectedStockPrice,
                 onBack = { screen = AppScreen.STOCK_DETAILS },
                 onOrderSuccess = { screen = AppScreen.PORTFOLIO }
             )

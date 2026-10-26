@@ -30,6 +30,7 @@ private fun sellMoney(value: Double): String =
 @Composable
 fun SellScreen(
     symbol: String,
+    stockPrice: Double? = null,
     onBack: () -> Unit,
     onOrderSuccess: () -> Unit = {}
 ) {
