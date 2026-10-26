@@ -9,21 +9,22 @@ import re
 import time
 from datetime import datetime, timezone
 from functools import lru_cache
+from typing import Any, Dict, List, Tuple
 
 from dotenv import load_dotenv
 from growwapi import GrowwAPI
 
 load_dotenv()
 
-DEFAULT_EXCHANGE_PREFIX = "NSE_"
-DEFAULT_CURRENCY = "INR"
-DEFAULT_SOURCE = "Groww"
-DEFAULT_FRESHNESS = "not_verified"
-GROWW_API_TIMEOUT_SECONDS = 10
-STALE_QUOTE_THRESHOLD_SECONDS = 60
+DEFAULT_EXCHANGE_PREFIX: str = "NSE_"
+DEFAULT_CURRENCY: str = "INR"
+DEFAULT_SOURCE: str = "Groww"
+DEFAULT_FRESHNESS: str = "not_verified"
+GROWW_API_TIMEOUT_SECONDS: int = 10
+STALE_QUOTE_THRESHOLD_SECONDS: int = 60
 
 SYMBOL_REGEX = re.compile(r"^[A-Z0-9&-]{1,20}$")
-SUPPORTED_HISTORY_RANGES = ("1D", "1W", "1M", "1Y")
+SUPPORTED_HISTORY_RANGES: Tuple[str, ...] = ("1D", "1W", "1M", "1Y")
 
 
 def normalize_symbol(raw_symbol: str) -> str:
@@ -115,7 +116,7 @@ def get_groww_client() -> GrowwAPI:
         raise RuntimeError("Failed to authenticate with market data provider") from None
 
 
-def get_live_quote(symbol: str) -> dict:
+def get_live_quote(symbol: str) -> Dict[str, Any]:
     """Fetches the latest traded price (LTP) for a given stock symbol.
 
     Args:
@@ -129,6 +130,7 @@ def get_live_quote(symbol: str) -> dict:
             - source (str): Data provider name ("Groww").
             - fetched_at (str): ISO 8601 UTC timestamp of retrieval.
             - freshness (str): Freshness status of the quote.
+            - previous_close (float): Previous day closing price.
 
     Raises:
         ValueError: If symbol is empty or contains non-alphanumeric characters.
@@ -161,10 +163,11 @@ def get_live_quote(symbol: str) -> dict:
         "source": DEFAULT_SOURCE,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "freshness": DEFAULT_FRESHNESS,
+        "previous_close": 0.0,
     }
 
 
-def get_stock_history(symbol: str, range_str: str = "1D") -> dict:
+def get_stock_history(symbol: str, range_str: str = "1D") -> Dict[str, Any]:
     """Fetches historical price candles for the specified symbol and range.
 
     Args:
@@ -200,7 +203,7 @@ def get_stock_history(symbol: str, range_str: str = "1D") -> dict:
     interval_ms = config["interval_ms"]
     now_ms = int(time.time() * 1000)
 
-    candles = []
+    candles: List[Dict[str, Any]] = []
     for i in range(count):
         variation = math.sin(i * 0.7) * 0.015
         open_val = base_price * (1.0 + variation)

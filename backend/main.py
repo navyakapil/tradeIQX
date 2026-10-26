@@ -53,7 +53,7 @@ def home():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
-@app.get("/market/quote/{symbol}")
+@app.get("/market/quote/{symbol}", response_model=schemas.MarketQuoteResponse)
 def market_quote(symbol: str):
     try:
         return get_live_quote(symbol)
@@ -82,7 +82,7 @@ def market_quote(symbol: str):
             detail="Market data provider request failed",
         )
 
-@app.get("/market/history/{symbol}")
+@app.get("/market/history/{symbol}", response_model=schemas.MarketHistoryResponse)
 def market_history(symbol: str, range: str = "1D"):
     try:
         return get_stock_history(symbol=symbol, range_str=range)

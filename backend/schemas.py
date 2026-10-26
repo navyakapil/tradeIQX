@@ -1,3 +1,4 @@
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr
 
 
@@ -20,8 +21,33 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class TradeRequest(BaseModel):
-        symbol: str
-        quantity: int
-        price: float
 
+class TradeRequest(BaseModel):
+    symbol: str
+    quantity: int
+    price: float
+
+
+class MarketQuoteResponse(BaseModel):
+    symbol: str
+    price: float
+    currency: str = "INR"
+    source: str
+    fetched_at: str
+    freshness: str
+    previous_close: float = 0.0
+
+
+class CandleResponse(BaseModel):
+    timestamp: int
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int = 0
+
+
+class MarketHistoryResponse(BaseModel):
+    symbol: str
+    range: str
+    candles: List[CandleResponse]
