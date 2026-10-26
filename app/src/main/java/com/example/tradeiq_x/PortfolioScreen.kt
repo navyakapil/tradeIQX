@@ -1,4 +1,3 @@
-
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.background
@@ -8,8 +7,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,19 +36,52 @@ fun PortfolioScreen(
     onBackClick: () -> Unit = {},
     onTransactionsClick: () -> Unit = {}
 ) {
-    val holdings = TradingStore.holdings.toMap()
-        .filterValues { it > 0 }
+    val context = LocalContext.current
 
-    val invested = holdings.entries.sumOf { (symbol, qty) ->
-        (TradingStore.averagePrices[symbol] ?: 0.0) * qty
+    LaunchedEffect(Unit) {
+        TradingStore.init(context)
+        TradingStore.refresh(context)
     }
 
-    val currentValue = holdings.entries.sumOf { (symbol, qty) ->
-        (TradingStore.prices[symbol] ?: 0.0) * qty
+    val summary = TradingStore.portfolioSummary.value
+    val cashBalance = summary?.cashBalance ?: TradingStore.balance.value
+    val invested = summary?.totalInvested ?: run {
+        TradingStore.holdings.entries.sumOf { (sym, qty) ->
+            (TradingStore.averagePrices[sym] ?: 0.0) * qty
+        }
     }
+    val currentValue = summary?.currentValue ?: run {
+        TradingStore.holdings.entries.sumOf { (sym, qty) ->
+            (TradingStore.prices[sym] ?: 0.0) * qty
+        }
+    }
+    val unrealizedPnl = summary?.unrealizedPnl ?: (currentValue - invested)
+    val realizedPnl = summary?.realizedPnl ?: 0.0
+    val totalPnl = summary?.totalPnl ?: (unrealizedPnl + realizedPnl)
+    val returnPercent = summary?.returnPercent ?: if (invested > 0) (totalPnl / invested * 100.0) else 0.0
+    val totalValue = cashBalance + currentValue
 
-    val profit = currentValue - invested
-    val totalValue = TradingStore.balance.value + currentValue
+    val holdingsList: List<Holding> = summary?.holdings?.filter { it.quantity > 0 } ?: run {
+        TradingStore.holdings.entries.filter { it.value > 0 }.map { (sym, qty) ->
+            val avg = TradingStore.averagePrices[sym] ?: 0.0
+            val cur = TradingStore.prices[sym] ?: 0.0
+            val inv = avg * qty
+            val curVal = cur * qty
+            val un = curVal - inv
+            val unPct = if (inv > 0) (un / inv * 100.0) else 0.0
+            Holding(
+                symbol = sym,
+                quantity = qty,
+                avgBuyPrice = avg,
+                currentPrice = cur,
+                investedValue = inv,
+                currentValue = curVal,
+                unrealizedPnl = un,
+                unrealizedPnlPercent = unPct,
+                realizedPnl = 0.0
+            )
+        }
+    }
 
     Column(
         Modifier
@@ -91,10 +126,22 @@ fun PortfolioScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                Text(
-                    "${if (profit >= 0) "+" else ""}${portMoney(profit)} unrealized P&L",
-                    color = if (profit >= 0) PortGreen else PortRed
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${if (unrealizedPnl >= 0) "+" else ""}${portMoney(unrealizedPnl)} unrealized P&L",
+                        color = if (unrealizedPnl >= 0) PortGreen else PortRed,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "${if (returnPercent >= 0) "+" else ""}${String.format(Locale.US, "%.2f", returnPercent)}%",
+                        color = if (returnPercent >= 0) PortGreen else PortRed,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 Spacer(Modifier.height(16.dp))
 
@@ -109,9 +156,18 @@ fun PortfolioScreen(
                     }
 
                     Column(Modifier.weight(1f)) {
+                        Text("Realized P&L", color = PortMuted, fontSize = 12.sp)
+                        Text(
+                            "${if (realizedPnl >= 0) "+" else ""}${portMoney(realizedPnl)}",
+                            color = if (realizedPnl >= 0) PortGreen else PortRed,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Column(Modifier.weight(1f)) {
                         Text("Available cash", color = PortMuted, fontSize = 12.sp)
                         Text(
-                            portMoney(TradingStore.balance.value),
+                            portMoney(cashBalance),
                             color = PortGreen,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -123,7 +179,7 @@ fun PortfolioScreen(
         Spacer(Modifier.height(18.dp))
 
         Text(
-            "Holdings (${holdings.size})",
+            "Holdings (${holdingsList.size})",
             color = PortText,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold
@@ -131,7 +187,7 @@ fun PortfolioScreen(
 
         Spacer(Modifier.height(10.dp))
 
-        if (holdings.isEmpty()) {
+        if (holdingsList.isEmpty()) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = PortCard),
                 shape = RoundedCornerShape(14.dp)
@@ -144,17 +200,15 @@ fun PortfolioScreen(
                     )
                 }
             }
+            Spacer(Modifier.weight(1f))
         } else {
             LazyColumn(
                 Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(holdings.entries.toList(), key = { it.key }) { entry ->
-                    val symbol = entry.key
-                    val qty = entry.value
-                    val avg = TradingStore.averagePrices[symbol] ?: 0.0
-                    val price = TradingStore.prices[symbol] ?: 0.0
-                    val pnl = (price - avg) * qty
+                items(holdingsList, key = { it.symbol }) { holding ->
+                    val pnl = holding.unrealizedPnl
+                    val pnlPercent = holding.unrealizedPnlPercent
 
                     Card(
                         colors = CardDefaults.cardColors(containerColor = PortCard),
@@ -166,13 +220,13 @@ fun PortfolioScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    symbol,
+                                    holding.symbol,
                                     color = PortText,
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    portMoney(price * qty),
+                                    portMoney(holding.currentValue),
                                     color = PortText,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -181,18 +235,29 @@ fun PortfolioScreen(
                             Spacer(Modifier.height(8.dp))
 
                             Text(
-                                "$qty shares · Avg. ${portMoney(avg)} · Current ${portMoney(price)}",
+                                "${holding.quantity} shares · Avg. ${portMoney(holding.avgBuyPrice)} · Current ${portMoney(holding.currentPrice)}",
                                 color = PortMuted,
                                 fontSize = 12.sp
                             )
 
                             Spacer(Modifier.height(6.dp))
 
-                            Text(
-                                "P&L: ${portMoney(pnl)}",
-                                color = if (pnl >= 0) PortGreen else PortRed,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    "Unrealized P&L: ${if (pnl >= 0) "+" else ""}${portMoney(pnl)}",
+                                    color = if (pnl >= 0) PortGreen else PortRed,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "${if (pnlPercent >= 0) "+" else ""}${String.format(Locale.US, "%.2f", pnlPercent)}%",
+                                    color = if (pnlPercent >= 0) PortGreen else PortRed,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
