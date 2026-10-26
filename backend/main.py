@@ -20,6 +20,8 @@ pwd_context = CryptContext(
     schemes=["bcrypt_sha256"],
     deprecated="auto"
 )
+# Pre-computed constant hash to mitigate user enumeration timing attacks
+DUMMY_PASSWORD_HASH = "$bcrypt-sha256$v=2,t=2b,r=12$7eqIpWvB1w58BOmY8K/6Se$D.2mF2sZ1n9q7Yv3Xwz2x9y0"
 
 
 def get_db():
@@ -397,7 +399,7 @@ def signup(user: schemas.UserRegister, db: Session = Depends(get_db)):
         return new_user
 
 
-@app.post("/auth/login")
+@app.post("/auth/login", response_model=schemas.LoginResponse)
 def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
         email = str(user.email).strip().lower()
 
@@ -405,9 +407,12 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
             User.email == email
         ).first()
 
-        if not existing_user or not verify_password(
-            user.password, existing_user.hashed_password
-        ):
+        if existing_user is None:
+            # Perform dummy verification to equalize execution time against timing attacks
+            verify_password(user.password, DUMMY_PASSWORD_HASH)
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        if not verify_password(user.password, existing_user.hashed_password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         return {
