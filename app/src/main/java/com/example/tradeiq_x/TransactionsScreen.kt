@@ -1,4 +1,3 @@
-
 package com.example.tradeiq_x
 
 import androidx.activity.compose.BackHandler
@@ -13,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,15 +36,27 @@ private fun txMoney(value: Double): String =
 
 @Composable
 fun TransactionsScreen(onBackClick: () -> Unit = {}) {
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        TradingStore.init(context)
+        TradingStore.refresh(context)
+    }
+
     var filter by rememberSaveable { mutableStateOf("ALL") }
+    var sortBy by rememberSaveable { mutableStateOf("NEWEST") }
 
-    val txs = TradingStore.transactions.toList()
-        .filter { filter == "ALL" || it.type == filter }
+    val rawTxs = TradingStore.transactions.toList()
+    val filtered = rawTxs.filter { filter == "ALL" || it.type == filter }
+    val txs = when (sortBy) {
+        "OLDEST" -> filtered.sortedBy { it.timestamp }
+        "AMOUNT" -> filtered.sortedByDescending { it.total }
+        else -> filtered.sortedByDescending { it.timestamp }
+    }
 
-    val formatter = SimpleDateFormat(
-        "dd MMM yyyy, hh:mm a",
-        Locale("en", "IN")
-    )
+    val formatter = remember {
+        SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale("en", "IN"))
+    }
 
     BackHandler(onBack = onBackClick)
 
@@ -73,6 +85,7 @@ fun TransactionsScreen(onBackClick: () -> Unit = {}) {
 
         Spacer(Modifier.height(16.dp))
 
+        // Direction Filter chips
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("ALL", "BUY", "SELL").forEach { option ->
                 FilterChip(
@@ -83,6 +96,24 @@ fun TransactionsScreen(onBackClick: () -> Unit = {}) {
                         selectedContainerColor = TxGreen,
                         selectedLabelColor = Color(0xFF062017),
                         labelColor = TxText
+                    )
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Sort order chips
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("NEWEST" to "Newest", "OLDEST" to "Oldest", "AMOUNT" to "Amount").forEach { (key, label) ->
+                FilterChip(
+                    selected = sortBy == key,
+                    onClick = { sortBy = key },
+                    label = { Text(label, fontSize = 12.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF1E3A5F),
+                        selectedLabelColor = TxText,
+                        labelColor = TxMuted
                     )
                 )
             }
