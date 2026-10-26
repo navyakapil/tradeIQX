@@ -3,6 +3,7 @@
 Provides access to live stock quotes and market data via the Groww API SDK.
 """
 
+import logging
 import math
 import os
 import re
@@ -15,6 +16,8 @@ from dotenv import load_dotenv
 from growwapi import GrowwAPI
 
 load_dotenv()
+
+logger = logging.getLogger("market_data")
 
 DEFAULT_EXCHANGE_PREFIX: str = "NSE_"
 DEFAULT_CURRENCY: str = "INR"
@@ -104,15 +107,19 @@ def get_groww_client() -> GrowwAPI:
     secret = os.getenv("GROWW_API_SECRET")
 
     if not api_key or not secret:
+        logger.warning("Groww API credentials missing in environment")
         raise RuntimeError("Market data provider credentials are not configured")
 
     try:
+        logger.info("Authenticating with Groww API provider")
         token = GrowwAPI.get_access_token(
             api_key=api_key,
             secret=secret,
         )
+        logger.info("Groww API authentication token exchanged successfully")
         return GrowwAPI(token)
     except Exception:
+        logger.error("Authentication with Groww API provider failed")
         raise RuntimeError("Failed to authenticate with market data provider") from None
 
 
@@ -139,6 +146,7 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
     """
     symbol = normalize_symbol(symbol)
     trading_symbol = f"{DEFAULT_EXCHANGE_PREFIX}{symbol}"
+    logger.info("Fetching quote for symbol=%s", symbol)
 
     try:
         client = get_groww_client()
@@ -149,12 +157,16 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
     except (ValueError, LookupError, RuntimeError):
         raise
     except Exception:
+        logger.warning("Upstream market provider call failed for symbol=%s", symbol)
         raise RuntimeError("Upstream market provider request failed") from None
 
     price = result.get(trading_symbol)
 
     if price is None or float(price) <= 0:
+        logger.warning("No valid price quote found for symbol=%s", symbol)
         raise LookupError("No valid quote returned for this symbol")
+
+    logger.info("Quote fetched successfully for symbol=%s price=%.2f", symbol, float(price))
 
     return {
         "symbol": symbol,
@@ -182,6 +194,7 @@ def get_stock_history(symbol: str, range_str: str = "1D") -> Dict[str, Any]:
     """
     clean_symbol = normalize_symbol(symbol)
     clean_range = validate_history_range(range_str)
+    logger.info("Fetching history for symbol=%s range=%s", clean_symbol, clean_range)
 
     # Determine base price: attempt live quote or fallback to baseline
     base_price = 1000.0
@@ -189,7 +202,7 @@ def get_stock_history(symbol: str, range_str: str = "1D") -> Dict[str, Any]:
         quote = get_live_quote(clean_symbol)
         base_price = quote["price"]
     except Exception:
-        pass
+        logger.debug("Falling back to default base price for symbol=%s history", clean_symbol)
 
     range_configs = {
         "1D": {"count": 24, "interval_ms": 3600 * 1000},
@@ -220,6 +233,8 @@ def get_stock_history(symbol: str, range_str: str = "1D") -> Dict[str, Any]:
             "close": round(close_val, 2),
             "volume": int(10000 + abs(math.sin(i)) * 50000),
         })
+
+    logger.info("History candles generated for symbol=%s range=%s count=%d", clean_symbol, clean_range, len(candles))
 
     return {
         "symbol": clean_symbol,
