@@ -26,7 +26,8 @@ private data class Stock(
     val name: String,
     val price: String,
     val change: String? = null,
-    val isPositive: Boolean? = null
+    val isPositive: Boolean? = null,
+    val status: MarketDataStatus = MarketDataStatus.DEMO
 )
 
 private val sampleStocks = listOf(
@@ -66,7 +67,8 @@ fun MarketWatchScreen(
                             name = quote.companyName,
                             price = MarketFormatters.formatInrPrice(quote.price),
                             change = quote.changePercent?.let { MarketFormatters.formatPercentChange(it) },
-                            isPositive = quote.change?.let { it >= 0.0 }
+                            isPositive = quote.change?.let { it >= 0.0 },
+                            status = MarketDataStatus.fromString(quote.status)
                         )
                     }
                 }
@@ -414,14 +416,27 @@ fun MarketWatchScreen(
             }
         }
 
-        Text(
-            text = MarketConstants.NOTICE_DEMO_DATA,
+        val overallStatus = stocksList.firstOrNull()?.status ?: MarketDataStatus.DEMO
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = overallStatus.badgeColor,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp),
-            fontSize = 11.sp,
-            color = MarketGrey,
-            textAlign = TextAlign.Center
-        )
+                .padding(vertical = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = overallStatus.noticeText(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = overallStatus.textColor,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
     }
 }

@@ -133,12 +133,18 @@ class LiveMarketRepository : MarketRepository {
                 status = response.optString("status", "LIVE")
             )
         } catch (exception: Exception) {
+            val message = exception.message.orEmpty()
+            val inferredStatus = when {
+                message.contains("provider_unauthorised") || message.contains("403") -> "UNAUTHORISED"
+                message.contains("Connection refused") || message.contains("failed to connect") || message.contains("unavailable") -> "OFFLINE"
+                else -> "OFFLINE"
+            }
             android.util.Log.e(
                 "LiveMarketRepository",
-                "Failed to fetch quote for $normalizedSymbol",
-                exception
+                "Failed to fetch quote for $normalizedSymbol ($inferredStatus): ${exception.message}"
             )
-            null
+            val fallback = MockMarketRepository().getQuote(normalizedSymbol)
+            fallback?.copy(status = inferredStatus)
         }
     }
 

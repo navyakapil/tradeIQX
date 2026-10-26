@@ -119,12 +119,31 @@ fun StockDetailsScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = stock,
-                    color = DetailsWhite,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                val stockStatus = MarketDataStatus.fromString(currentQuote?.status)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stock,
+                        color = DetailsWhite,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = stockStatus.badgeColor
+                    ) {
+                        Text(
+                            text = stockStatus.displayName,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = stockStatus.textColor
+                        )
+                    }
+                }
 
                 Text(
                     text = company,
