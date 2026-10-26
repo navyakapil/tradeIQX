@@ -74,12 +74,7 @@ fun StockDetailsScreen(
 
     val company = companyNames[stock] ?: stock
 
-    val displayChangePercent = currentQuote?.changePercent ?: when (stock) {
-        "TCS" -> 1.20
-        "INFY" -> 0.60
-        "HDFCBANK" -> -0.42
-        else -> 1.32
-    }
+    val displayChangePercent = currentQuote?.changePercent
 
     Column(
         modifier = Modifier
@@ -146,19 +141,27 @@ fun StockDetailsScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = MarketFormatters.formatPercentChange(displayChangePercent),
-                        color = MarketColors.darkChangeColor(displayChangePercent >= 0),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                if (displayChangePercent != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = MarketFormatters.formatPercentChange(displayChangePercent),
+                            color = MarketColors.darkChangeColor(displayChangePercent >= 0),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
 
+                        Text(
+                            text = "• $lastUpdated",
+                            color = DetailsMuted,
+                            fontSize = 13.sp
+                        )
+                    }
+                } else {
                     Text(
-                        text = "• $lastUpdated",
+                        text = "Updated $lastUpdated",
                         color = DetailsMuted,
                         fontSize = 13.sp
                     )

@@ -48,19 +48,32 @@ data class StockQuote(
     val symbol: String,
     val companyName: String,
     val price: Double,
-    val previousClose: Double,
+    val previousClose: Double? = null,
+    val change: Double? = null,
+    val changePercent: Double? = null,
     val currency: String = MarketConstants.DEFAULT_CURRENCY,
-    val lastUpdated: String? = null
+    val lastUpdated: String? = null,
+    val status: String = "LIVE"
 ) {
-    val change: Double
-        get() = price - previousClose
-
-    val changePercent: Double
-        get() = if (previousClose > 0.0) {
-            (change / previousClose) * 100.0
-        } else {
-            0.0
-        }
+    constructor(
+        symbol: String,
+        companyName: String,
+        price: Double,
+        previousClose: Double?,
+        currency: String = MarketConstants.DEFAULT_CURRENCY,
+        lastUpdated: String? = null,
+        status: String = "LIVE"
+    ) : this(
+        symbol = symbol,
+        companyName = companyName,
+        price = price,
+        previousClose = previousClose,
+        change = previousClose?.let { price - it },
+        changePercent = previousClose?.let { if (it > 0.0) ((price - it) / it) * 100.0 else null },
+        currency = currency,
+        lastUpdated = lastUpdated,
+        status = status
+    )
 }
 
 data class PriceCandle(

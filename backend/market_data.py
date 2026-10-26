@@ -184,12 +184,99 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
     trading_symbol = f"{DEFAULT_EXCHANGE_PREFIX}{symbol}"
     logger.info("Fetching quote for symbol=%s", symbol)
 
+    price: Optional[float] = None
+    previous_close: Optional[float] = None
+
     try:
         client = get_groww_client()
-        result = client.get_ltp(
-            segment=client.SEGMENT_CASH,
-            exchange_trading_symbols=(trading_symbol,),
-        )
+
+        # Try comprehensive quote first
+        try:
+            quote_resp = client.get_quote(
+                trading_symbol=symbol,
+                exchange=DEFAULT_EXCHANGE,
+                segment=client.SEGMENT_CASH,
+                timeout=GROWW_REQUEST_TIMEOUT_SECONDS,
+            )
+            if isinstance(quote_resp, dict):
+                p = quote_resp.get("last_price") or quote_resp.get("ltp") or quote_resp.get("price")
+                if p is not None:
+                    price = float(p)
+                pc = (
+                    quote_resp.get("previous_close")
+                    or quote_resp.get("close")
+                    or (quote_resp.get("ohlc", {}).get("close") if isinstance(quote_resp.get("ohlc"), dict) else None)
+                )
+                if pc is not None and float(pc) > 0:
+                    previous_close = float(pc)
+        except (GrowwAPIAuthorisationException, GrowwAPIAuthenticationException):
+            raise
+        except Exception:
+            pass
+
+        # Try get_ohlc if price or previous_close not yet found
+        if price is None or previous_close is None:
+            try:
+                ohlc_resp = client.get_ohlc(
+                    segment=client.SEGMENT_CASH,
+                    exchange_trading_symbols=(trading_symbol,),
+                    timeout=GROWW_REQUEST_TIMEOUT_SECONDS,
+                )
+                if isinstance(ohlc_resp, dict) and trading_symbol in ohlc_resp:
+                    sym_info = ohlc_resp[trading_symbol]
+                    if isinstance(sym_info, dict):
+                        if price is None:
+                            p = sym_info.get("last_price") or sym_info.get("ltp")
+                            if p is not None:
+                                price = float(p)
+                        if previous_close is None:
+                            pc = sym_info.get("close")
+                            if pc is not None and float(pc) > 0:
+                                previous_close = float(pc)
+            except (GrowwAPIAuthorisationException, GrowwAPIAuthenticationException):
+                raise
+            except Exception:
+                pass
+
+        # Fallback to get_ltp for price if needed
+        if price is None:
+            result = client.get_ltp(
+                segment=client.SEGMENT_CASH,
+                exchange_trading_symbols=(trading_symbol,),
+                timeout=GROWW_REQUEST_TIMEOUT_SECONDS,
+            )
+            p = result.get(trading_symbol)
+            if p is not None:
+                price = float(p)
+
+        # If previous_close still unavailable, attempt prior daily candle lookup
+        if previous_close is None:
+            try:
+                now_dt = datetime.now()
+                start_dt = now_dt - timedelta(days=5)
+                candle_resp = client.get_historical_candle_data(
+                    trading_symbol=symbol,
+                    exchange=DEFAULT_EXCHANGE,
+                    segment=client.SEGMENT_CASH,
+                    start_time=start_dt.strftime("%Y-%m-%d 09:15:00"),
+                    end_time=now_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                    interval_in_minutes=client.CANDLE_INTERVAL_DAY,
+                    timeout=GROWW_REQUEST_TIMEOUT_SECONDS,
+                )
+                raw_candles = candle_resp.get("candles") if isinstance(candle_resp, dict) else candle_resp
+                if isinstance(raw_candles, list) and len(raw_candles) >= 1:
+                    prior_candle = raw_candles[-1]
+                    if len(raw_candles) >= 2:
+                        prior_candle = raw_candles[-2]
+                    if isinstance(prior_candle, (list, tuple)) and len(prior_candle) >= 5:
+                        c_val = float(prior_candle[4])
+                        if c_val > 0:
+                            previous_close = c_val
+            except (GrowwAPIAuthorisationException, GrowwAPIAuthenticationException):
+                raise
+            except Exception:
+                previous_close = None
+
     except (GrowwAPIAuthorisationException, GrowwAPIAuthenticationException):
         raise MarketProviderAuthorisationError("provider_unauthorised") from None
     except GrowwAPIRateLimitException:
@@ -202,24 +289,28 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
         logger.warning("Upstream market provider call failed for symbol=%s: %s", symbol, type(exc).__name__)
         raise MarketProviderUnavailableError("unavailable") from None
 
-    price = result.get(trading_symbol)
-
-    if price is None or float(price) <= 0:
+    if price is None or price <= 0:
         logger.warning("No valid price quote found for symbol=%s", symbol)
         raise LookupError("No valid quote returned for this symbol")
 
-    logger.info("Quote fetched successfully for symbol=%s price=%.2f", symbol, float(price))
+    change: Optional[float] = None
+    change_percent: Optional[float] = None
+    if previous_close is not None and previous_close > 0:
+        change = round(price - previous_close, 2)
+        change_percent = round((change / previous_close) * 100.0, 2)
+
+    logger.info("Quote fetched successfully for symbol=%s price=%.2f change=%s", symbol, price, change)
 
     return {
         "symbol": symbol,
-        "price": float(price),
+        "price": price,
         "currency": DEFAULT_CURRENCY,
         "source": DEFAULT_SOURCE,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "freshness": "live",
-        "previous_close": None,
-        "change": None,
-        "change_percent": None,
+        "previous_close": previous_close,
+        "change": change,
+        "change_percent": change_percent,
         "status": "LIVE",
     }
 

@@ -107,15 +107,30 @@ class LiveMarketRepository : MarketRepository {
                 return null
             }
 
+            val previousClose = if (response.has("previous_close") && !response.isNull("previous_close")) {
+                response.optDouble("previous_close").takeIf { it.isFinite() && it > 0.0 }
+            } else null
+
+            val change = if (response.has("change") && !response.isNull("change")) {
+                response.optDouble("change").takeIf { it.isFinite() }
+            } else previousClose?.let { price - it }
+
+            val changePercent = if (response.has("change_percent") && !response.isNull("change_percent")) {
+                response.optDouble("change_percent").takeIf { it.isFinite() }
+            } else previousClose?.let { if (it > 0.0) ((price - it) / it) * 100.0 else null }
+
             StockQuote(
                 symbol = normalizedSymbol,
                 companyName = companyNames[normalizedSymbol]
                     ?: normalizedSymbol,
                 price = price,
-                previousClose = 0.0,
+                previousClose = previousClose,
+                change = change,
+                changePercent = changePercent,
                 currency = MarketConstants.DEFAULT_CURRENCY,
                 lastUpdated = response.optString("fetched_at")
-                    .takeIf { it.isNotBlank() }
+                    .takeIf { it.isNotBlank() },
+                status = response.optString("status", "LIVE")
             )
         } catch (exception: Exception) {
             android.util.Log.e(

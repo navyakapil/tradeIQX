@@ -25,8 +25,8 @@ private data class Stock(
     val symbol: String,
     val name: String,
     val price: String,
-    val change: String,
-    val isPositive: Boolean
+    val change: String? = null,
+    val isPositive: Boolean? = null
 )
 
 private val sampleStocks = listOf(
@@ -65,8 +65,8 @@ fun MarketWatchScreen(
                             symbol = quote.symbol,
                             name = quote.companyName,
                             price = MarketFormatters.formatInrPrice(quote.price),
-                            change = MarketFormatters.formatPercentChange(quote.changePercent),
-                            isPositive = quote.change >= 0.0
+                            change = quote.changePercent?.let { MarketFormatters.formatPercentChange(it) },
+                            isPositive = quote.change?.let { it >= 0.0 }
                         )
                     }
                 }
@@ -92,8 +92,8 @@ fun MarketWatchScreen(
                     stock.name.contains(searchQuery, ignoreCase = true)
 
         val matchesCategory = when (selectedCategory) {
-            "Top Gainers" -> stock.isPositive
-            "Top Losers" -> !stock.isPositive
+            "Top Gainers" -> stock.isPositive == true
+            "Top Losers" -> stock.isPositive == false
             else -> true
         }
 
@@ -379,20 +379,22 @@ fun MarketWatchScreen(
 
                             Spacer(Modifier.height(4.dp))
 
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MarketColors.changeBackground(stock.isPositive)
-                            ) {
-                                Text(
-                                    text = stock.change,
-                                    modifier = Modifier.padding(
-                                        horizontal = 7.dp,
-                                        vertical = 4.dp
-                                    ),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MarketColors.changeColor(stock.isPositive)
-                                )
+                            if (stock.change != null && stock.isPositive != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MarketColors.changeBackground(stock.isPositive)
+                                ) {
+                                    Text(
+                                        text = stock.change,
+                                        modifier = Modifier.padding(
+                                            horizontal = 7.dp,
+                                            vertical = 4.dp
+                                        ),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MarketColors.changeColor(stock.isPositive)
+                                    )
+                                }
                             }
                         }
                     }
