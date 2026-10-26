@@ -654,7 +654,7 @@ fun HomeScreen(
 
         QuickAccessCard(
             "🤖",
-            "AI Chatbot",
+            "AI Trading Mentor",
             "Ask questions about stocks and investing",
             onClick = onChatbot
         )
