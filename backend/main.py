@@ -1,5 +1,5 @@
 from typing import Dict, Optional
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel, Field
@@ -40,6 +40,16 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def get_current_user_id(x_user_id: Optional[int] = Header(None)) -> Optional[int]:
+    return x_user_id
+
+
+def resolve_user_portfolio(db: Session, user_id: Optional[int] = None) -> Optional[Portfolio]:
+    if user_id is not None:
+        return db.query(Portfolio).filter(Portfolio.user_id == user_id).first()
+    return db.query(Portfolio).first()
+
 
 def hash_password(password: str):
     return pwd_context.hash(password)
@@ -107,8 +117,11 @@ def market_quote(symbol: str):
             detail="Market data provider request failed",
         )
 @app.get("/portfolio")
-def get_portfolio(db: Session = Depends(get_db)):
-    portfolio = db.query(Portfolio).first()
+def get_portfolio(
+    db: Session = Depends(get_db),
+    user_id: Optional[int] = Depends(get_current_user_id)
+):
+    portfolio = resolve_user_portfolio(db, user_id)
 
     if portfolio is None:
         raise HTTPException(
@@ -156,7 +169,8 @@ def get_portfolio(db: Session = Depends(get_db)):
 @app.post("/buy")
 def buy_stock(
     trade: TradeRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: Optional[int] = Depends(get_current_user_id)
 ):
     symbol = trade.symbol.strip().upper()
 
@@ -178,14 +192,11 @@ def buy_stock(
             detail="Price must be greater than zero"
         )
 
-    # Temporary single-user implementation.
-    # We will connect this to the authenticated user next.
-
-    portfolio = db.query(Portfolio).first()
+    portfolio = resolve_user_portfolio(db, user_id)
 
     if portfolio is None:
         portfolio = Portfolio(
-            user_id=1,
+            user_id=user_id or 1,
             cash_balance=100000.0
         )
         db.add(portfolio)
@@ -283,7 +294,8 @@ def buy_stock(
 @app.post("/sell")
 def sell_stock(
     trade: TradeRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: Optional[int] = Depends(get_current_user_id)
 ):
     symbol = trade.symbol.strip().upper()
 
@@ -305,7 +317,7 @@ def sell_stock(
             detail="Price must be greater than zero"
         )
 
-    portfolio = db.query(Portfolio).first()
+    portfolio = resolve_user_portfolio(db, user_id)
 
     if portfolio is None:
         raise HTTPException(
