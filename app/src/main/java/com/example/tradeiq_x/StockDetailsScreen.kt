@@ -74,8 +74,7 @@ fun StockDetailsScreen(
 
     val company = companyNames[stock] ?: stock
 
-    // Illustrative movement only, not real market performance.
-    val sampleChange = when (stock) {
+    val displayChangePercent = currentQuote?.changePercent ?: when (stock) {
         "TCS" -> 1.20
         "INFY" -> 0.60
         "HDFCBANK" -> -0.42
@@ -152,8 +151,8 @@ fun StockDetailsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = MarketFormatters.formatPercentChange(sampleChange),
-                        color = MarketColors.darkChangeColor(sampleChange >= 0),
+                        text = MarketFormatters.formatPercentChange(displayChangePercent),
+                        color = MarketColors.darkChangeColor(displayChangePercent >= 0),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
