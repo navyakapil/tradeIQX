@@ -154,6 +154,32 @@ def get_groww_client() -> GrowwAPI:
         raise MarketProviderUnavailableError("unavailable") from None
 
 
+def parse_provider_timestamp(data: Any) -> Optional[datetime]:
+    """Extracts and parses provider timestamp into a timezone-aware UTC datetime."""
+    if not isinstance(data, dict):
+        return None
+    raw = (
+        data.get("timestamp")
+        or data.get("time")
+        or data.get("last_trade_time")
+        or data.get("last_price_time")
+        or data.get("updated_at")
+    )
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        # If timestamp is in milliseconds (e.g. > 1e11), convert from ms
+        if raw > 1e11:
+            return datetime.fromtimestamp(raw / 1000.0, tz=timezone.utc)
+        return datetime.fromtimestamp(raw, tz=timezone.utc)
+    if isinstance(raw, str):
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except Exception:
+            return None
+    return None
+
+
 def get_live_quote(symbol: str) -> Dict[str, Any]:
     """Fetches the latest traded price (LTP) for a given stock symbol.
 
@@ -186,6 +212,8 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
 
     price: Optional[float] = None
     previous_close: Optional[float] = None
+    quote_resp: Optional[Dict[str, Any]] = None
+    ohlc_resp: Optional[Dict[str, Any]] = None
 
     try:
         client = get_groww_client()
@@ -301,17 +329,30 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
 
     logger.info("Quote fetched successfully for symbol=%s price=%.2f change=%s", symbol, price, change)
 
+    now_utc = datetime.now(timezone.utc)
+    provider_dt = parse_provider_timestamp(quote_resp)
+    if provider_dt is None and isinstance(ohlc_resp, dict) and trading_symbol in ohlc_resp:
+        provider_dt = parse_provider_timestamp(ohlc_resp[trading_symbol])
+
+    if provider_dt is not None:
+        age_seconds = abs((now_utc - provider_dt).total_seconds())
+        freshness = "live" if age_seconds <= STALE_QUOTE_THRESHOLD_SECONDS else "stale"
+    else:
+        freshness = "unavailable"
+
+    status_val = "LIVE" if freshness == "live" else ("DELAYED" if freshness == "stale" else "LIVE")
+
     return {
         "symbol": symbol,
         "price": price,
         "currency": DEFAULT_CURRENCY,
         "source": DEFAULT_SOURCE,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-        "freshness": "live",
+        "fetched_at": now_utc.isoformat(),
+        "freshness": freshness,
         "previous_close": previous_close,
         "change": change,
         "change_percent": change_percent,
-        "status": "LIVE",
+        "status": status_val,
     }
 
 
