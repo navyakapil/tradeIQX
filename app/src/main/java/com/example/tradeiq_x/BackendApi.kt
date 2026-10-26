@@ -131,4 +131,49 @@ object BackendApi {
                 connection.disconnect()
             }
         }
+    suspend fun getHistory(symbol: String, range: String): JSONObject =
+        withContext(Dispatchers.IO) {
+            val safeSymbol = symbol.trim().uppercase()
+            require(safeSymbol.matches(Regex("[A-Z0-9&-]+"))) {
+                "Invalid stock symbol"
+            }
+
+            val safeRange = range.trim().uppercase()
+            val connection = URL(
+                "$BASE_URL/market/history/$safeSymbol?range=$safeRange"
+            ).openConnection() as HttpURLConnection
+
+            try {
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 10000
+                connection.readTimeout = 15000
+
+                val status = connection.responseCode
+                val stream = if (status in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+                val response = stream?.bufferedReader()?.use {
+                    it.readText()
+                } ?: "{}"
+
+                if (status !in 200..299) {
+                    val message = try {
+                        JSONObject(response).optString(
+                            "detail",
+                            "History request failed: $status"
+                        )
+                    } catch (_: Exception) {
+                        "History request failed: $status"
+                    }
+                    throw Exception(message)
+                }
+
+                JSONObject(response)
+            } finally {
+                connection.disconnect()
+            }
+        }
 }

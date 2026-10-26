@@ -142,9 +142,13 @@ class LiveMarketRepository : MarketRepository {
         }
     }
 
+    var isLastHistoryDemo: Boolean = false
+        private set
+
     /**
-     * Fetches historical candle data for chart rendering.
-     * Falls back to deterministic mock candles if live history endpoint is offline.
+     * Fetches historical candle data for chart rendering from the backend service.
+     * Falls back to deterministic mock candles WITH a clear demo indicator if the live history
+     * endpoint is unauthorized or offline. Never presents demo candles as real.
      */
     override suspend fun getHistory(
         symbol: String,
@@ -153,8 +157,43 @@ class LiveMarketRepository : MarketRepository {
         val normalizedSymbol = try {
             normalizeMarketSymbol(symbol)
         } catch (_: IllegalArgumentException) {
+            isLastHistoryDemo = true
             return emptyList()
         }
-        return MockMarketRepository().getHistory(normalizedSymbol, range)
+
+        return try {
+            val response = retryTransient {
+                BackendApi.getHistory(normalizedSymbol, range.label)
+            }
+            val candlesArray = response.optJSONArray("candles")
+            if (candlesArray != null && candlesArray.length() > 0) {
+                val parsed = mutableListOf<PriceCandle>()
+                for (i in 0 until candlesArray.length()) {
+                    val c = candlesArray.getJSONObject(i)
+                    parsed.add(
+                        PriceCandle(
+                            timestamp = c.optLong("timestamp"),
+                            open = c.optDouble("open"),
+                            high = c.optDouble("high"),
+                            low = c.optDouble("low"),
+                            close = c.optDouble("close"),
+                            volume = c.optLong("volume", 0L)
+                        )
+                    )
+                }
+                isLastHistoryDemo = false
+                parsed
+            } else {
+                isLastHistoryDemo = true
+                MockMarketRepository().getHistory(normalizedSymbol, range)
+            }
+        } catch (exception: Exception) {
+            android.util.Log.w(
+                "LiveMarketRepository",
+                "Backend history unavailable for $normalizedSymbol (${exception.message}); returning demo candles with demo tag"
+            )
+            isLastHistoryDemo = true
+            MockMarketRepository().getHistory(normalizedSymbol, range)
+        }
     }
 }

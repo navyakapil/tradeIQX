@@ -293,8 +293,14 @@ fun StockDetailsScreen(
                     }
                 }
 
+                val isHistoryDemo = (MarketDataManager.repository as? LiveMarketRepository)?.isLastHistoryDemo ?: true
+                val chartNotice = if (isHistoryDemo) {
+                    "Illustrative chart · ${MarketConstants.NOTICE_DEMO_DATA}"
+                } else {
+                    "Live chart · ${MarketConstants.NOTICE_LIVE_DATA}"
+                }
                 Text(
-                    text = "Illustrative chart · ${MarketConstants.NOTICE_DEMO_DATA}",
+                    text = chartNotice,
                     color = DetailsMuted,
                     fontSize = 11.sp
                 )
