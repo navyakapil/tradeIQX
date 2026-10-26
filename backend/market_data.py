@@ -9,7 +9,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from growwapi import GrowwAPI
@@ -31,11 +31,13 @@ else:
 
 logger = logging.getLogger("market_data")
 
+DEFAULT_EXCHANGE: str = "NSE"
 DEFAULT_EXCHANGE_PREFIX: str = "NSE_"
 DEFAULT_CURRENCY: str = "INR"
 DEFAULT_SOURCE: str = "Groww"
 DEFAULT_FRESHNESS: str = "not_verified"
 GROWW_API_TIMEOUT_SECONDS: int = 10
+GROWW_REQUEST_TIMEOUT_SECONDS: int = 10
 STALE_QUOTE_THRESHOLD_SECONDS: int = 60
 
 SYMBOL_REGEX = re.compile(r"^[A-Z0-9&-]{1,20}$")
@@ -323,7 +325,14 @@ def get_live_quote(symbol: str) -> Dict[str, Any]:
 
     change: Optional[float] = None
     change_percent: Optional[float] = None
-    if previous_close is not None and previous_close > 0:
+    if isinstance(quote_resp, dict) and quote_resp.get("day_change") is not None:
+        try:
+            change = round(float(quote_resp["day_change"]), 2)
+            if quote_resp.get("day_change_perc") is not None:
+                change_percent = round(float(quote_resp["day_change_perc"]), 2)
+        except Exception:
+            pass
+    if change is None and previous_close is not None and previous_close > 0:
         change = round(price - previous_close, 2)
         change_percent = round((change / previous_close) * 100.0, 2)
 
@@ -404,7 +413,7 @@ def get_stock_history(symbol: str, range_str: str = "1D") -> Dict[str, Any]:
 
     try:
         raw_response = client.get_historical_candle_data(
-            trading_symbol=trading_symbol,
+            trading_symbol=clean_symbol,
             exchange="NSE",
             segment=client.SEGMENT_CASH,
             start_time=start_str,
