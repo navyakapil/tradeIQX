@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 
 from database import SessionLocal, engine
-from models import Base, User, Portfolio, Holding, Trade
+from models import Base, User, Account, Portfolio, Holding, Order, Trade
 import schemas
 
 TradeRequest = schemas.TradeRequest
@@ -71,10 +71,44 @@ def get_current_user_id(x_user_id: Optional[int] = Header(None)) -> Optional[int
     return x_user_id
 
 
-def resolve_user_portfolio(db: Session, user_id: Optional[int] = None) -> Optional[Portfolio]:
-    if user_id is not None:
-        return db.query(Portfolio).filter(Portfolio.user_id == user_id).first()
-    return db.query(Portfolio).first()
+def get_or_create_user_account(db: Session, user_id: Optional[int] = None) -> tuple[int, Account, Portfolio]:
+    effective_id = user_id if user_id is not None else 1
+    user = db.query(User).filter(User.id == effective_id).first()
+    if not user:
+        user = User(
+            id=effective_id,
+            username=f"demo_trader_{effective_id}",
+            email=f"trader_{effective_id}@tradeiqx.demo",
+            hashed_password=DUMMY_PASSWORD_HASH
+        )
+        db.add(user)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            user = db.query(User).filter(User.id == effective_id).first()
+
+    account = db.query(Account).filter(Account.user_id == effective_id).first()
+    portfolio = db.query(Portfolio).filter(Portfolio.user_id == effective_id).first()
+
+    if not account:
+        cash = portfolio.cash_balance if portfolio else 1_000_000.0
+        account = Account(user_id=effective_id, cash=cash)
+        db.add(account)
+
+    if not portfolio:
+        portfolio = Portfolio(user_id=effective_id, cash_balance=account.cash)
+        db.add(portfolio)
+
+    db.commit()
+    db.refresh(account)
+    db.refresh(portfolio)
+    return effective_id, account, portfolio
+
+
+def resolve_user_portfolio(db: Session, user_id: Optional[int] = None) -> Portfolio:
+    _, _, portfolio = get_or_create_user_account(db, user_id)
+    return portfolio
 
 
 def hash_password(password: str):
