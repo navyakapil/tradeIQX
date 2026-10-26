@@ -1,4 +1,5 @@
 package com.example.tradeiq_x
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -44,6 +45,7 @@ fun MarketWatchScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
+    val lastUpdated = remember { MarketFormatters.formatRelativeTime(null) }
 
     val categories = listOf(
         "All",
@@ -94,7 +96,7 @@ fun MarketWatchScreen(
                 )
 
                 Text(
-                    text = "Explore the stock market",
+                    text = "Explore the stock market · $lastUpdated",
                     fontSize = 13.sp,
                     color = MarketGrey
                 )

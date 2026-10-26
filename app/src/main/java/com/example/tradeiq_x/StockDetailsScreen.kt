@@ -1,4 +1,3 @@
-
 package com.example.tradeiq_x
 
 import androidx.compose.foundation.background
@@ -8,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,6 +42,7 @@ fun StockDetailsScreen(
 ) {
     val stock = symbol.uppercase()
     val price = TradingStore.prices[stock] ?: 0.0
+    val lastUpdated = remember { MarketFormatters.formatRelativeTime(null) }
 
     val companyNames = mapOf(
         "RELIANCE" to "Reliance Industries Ltd.",
@@ -125,14 +126,25 @@ fun StockDetailsScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                Text(
-                    text = "${if (sampleChange >= 0) "+" else ""}" +
-                            String.format(Locale.US, "%.2f%%", sampleChange),
-                    color = if (sampleChange >= 0)
-                        DetailsGreen else DetailsRed,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "${if (sampleChange >= 0) "+" else ""}" +
+                                String.format(Locale.US, "%.2f%%", sampleChange),
+                        color = if (sampleChange >= 0)
+                            DetailsGreen else DetailsRed,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Text(
+                        text = "• $lastUpdated",
+                        color = DetailsMuted,
+                        fontSize = 13.sp
+                    )
+                }
 
                 Spacer(Modifier.height(12.dp))
 
