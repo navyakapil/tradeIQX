@@ -23,8 +23,21 @@ import schemas
 
 TradeRequest = schemas.TradeRequest
 
+from sqlalchemy import text
+
 app = FastAPI(title="TradeIQX API")
 Base.metadata.create_all(bind=engine)
+
+# Auto-migrate SQLite schema columns for existing databases
+try:
+    with engine.connect() as _conn:
+        _result = _conn.execute(text("PRAGMA table_info(users)"))
+        _cols = [row[1] for row in _result.fetchall()]
+        if _cols and "created_at" not in _cols:
+            _conn.execute(text("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
+            _conn.commit()
+except Exception:
+    pass
 
 
 @app.exception_handler(SQLAlchemyError)
@@ -57,7 +70,7 @@ pwd_context = CryptContext(
     deprecated="auto"
 )
 # Pre-computed constant hash to mitigate user enumeration timing attacks
-DUMMY_PASSWORD_HASH = "$bcrypt-sha256$v=2,t=2b,r=12$7eqIpWvB1w58BOmY8K/6Se$D.2mF2sZ1n9q7Yv3Xwz2x9y0"
+DUMMY_PASSWORD_HASH = "$bcrypt-sha256$v=2,t=2b,r=12$7XFqVCnnkYvASSFyDh1jae$csNqCLfrhQW0sKeEvnu3TMLz2NFcbJC"
 
 
 def get_db():

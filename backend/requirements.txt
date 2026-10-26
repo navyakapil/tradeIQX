@@ -1,7 +1,7 @@
-
 fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
 passlib[bcrypt]
 httpx
+bcrypt==4.0.1
