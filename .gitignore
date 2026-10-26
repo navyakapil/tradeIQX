@@ -16,7 +16,17 @@ build/
 .env.*
 !.env.example
 .venv/
+backend/.venv/
 backend/venv/
+venv/
 __pycache__/
 *.py[cod]
 *.db
+*.sqlite3
+tradeiqx.db
+
+# Firebase and Cloud Credentials
+.firebase/
+*serviceAccount*.json
+*service-account*.json
+*credentials*.json
