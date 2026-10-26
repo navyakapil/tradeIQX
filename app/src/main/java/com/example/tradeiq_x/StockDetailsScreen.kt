@@ -74,12 +74,7 @@ fun StockDetailsScreen(
 
     val company = companyNames[stock] ?: stock
 
-    val displayChangePercent = currentQuote?.changePercent ?: when (stock) {
-        "TCS" -> 1.20
-        "INFY" -> 0.60
-        "HDFCBANK" -> -0.42
-        else -> 1.32
-    }
+    val displayChangePercent = currentQuote?.changePercent
 
     Column(
         modifier = Modifier
@@ -124,12 +119,31 @@ fun StockDetailsScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = stock,
-                    color = DetailsWhite,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                val stockStatus = MarketDataStatus.fromString(currentQuote?.status)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stock,
+                        color = DetailsWhite,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = stockStatus.badgeColor
+                    ) {
+                        Text(
+                            text = stockStatus.displayName,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = stockStatus.textColor
+                        )
+                    }
+                }
 
                 Text(
                     text = company,
@@ -146,19 +160,27 @@ fun StockDetailsScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = MarketFormatters.formatPercentChange(displayChangePercent),
-                        color = MarketColors.darkChangeColor(displayChangePercent >= 0),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                if (displayChangePercent != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = MarketFormatters.formatPercentChange(displayChangePercent),
+                            color = MarketColors.darkChangeColor(displayChangePercent >= 0),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
 
+                        Text(
+                            text = "• $lastUpdated",
+                            color = DetailsMuted,
+                            fontSize = 13.sp
+                        )
+                    }
+                } else {
                     Text(
-                        text = "• $lastUpdated",
+                        text = "Updated $lastUpdated",
                         color = DetailsMuted,
                         fontSize = 13.sp
                     )
@@ -290,8 +312,14 @@ fun StockDetailsScreen(
                     }
                 }
 
+                val isHistoryDemo = (MarketDataManager.repository as? LiveMarketRepository)?.isLastHistoryDemo ?: true
+                val chartNotice = if (isHistoryDemo) {
+                    "Illustrative chart · ${MarketConstants.NOTICE_DEMO_DATA}"
+                } else {
+                    "Live chart · ${MarketConstants.NOTICE_LIVE_DATA}"
+                }
                 Text(
-                    text = "Illustrative chart · ${MarketConstants.NOTICE_DEMO_DATA}",
+                    text = chartNotice,
                     color = DetailsMuted,
                     fontSize = 11.sp
                 )

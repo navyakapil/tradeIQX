@@ -491,7 +491,7 @@ fun HomeScreen(
             "✦",
             "AI Assistant",
             "Ask questions about stocks and investing",
-            onClick = onAIChatbot
+            onClick = onChatbot
         )
 
         Spacer(Modifier.height(20.dp))
