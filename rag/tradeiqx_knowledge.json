@@ -460,5 +460,66 @@
       "market correction"
     ],
     "content": "A bull market is a financial market condition where stock prices are consistently rising or expected to rise, typically marked by a 20% or more rally from recent market lows amidst strong investor confidence and economic expansion. Conversely, a bear market is characterized by widespread pessimism, sustained downward price pressure, and drops of 20% or more from recent peaks across major indices like Nifty or Sensex. Understanding whether the market is bullish or bearish helps investors manage risk, calibrate cash allocation, and set realistic expectations for returns."
+  },
+  {
+    "id": "RM006",
+    "topic": "Trailing Stop-Loss and Placement",
+    "category": "Risk Management",
+    "difficulty": "Intermediate",
+    "keywords": [
+      "trailing stop loss",
+      "stop loss placement",
+      "support level",
+      "ATR",
+      "profit locking",
+      "risk control"
+    ],
+    "content": "A trailing stop-loss is an adaptive stop order that adjusts automatically as the stock price moves favourably in the trader's direction. For long positions, the stop level trails behind the rising market price by a fixed percentage or rupee amount, locking in paper gains while protecting against sudden reversals. Proper stop-loss placement relies on technical structural levels (such as just below significant support or swing lows) or market volatility indicators like Average True Range (ATR), rather than arbitrary numbers, preventing premature exits on normal market noise."
+  },
+  {
+    "id": "RM007",
+    "topic": "Asset Allocation",
+    "category": "Risk Management",
+    "difficulty": "Beginner",
+    "keywords": [
+      "asset allocation",
+      "equity",
+      "debt",
+      "cash",
+      "portfolio weights",
+      "rebalancing",
+      "risk tolerance"
+    ],
+    "content": "Asset allocation is the investment strategy of dividing a portfolio across distinct asset categories—primarily equities (stocks), fixed income (bonds/debt), gold, and cash equivalents. The optimal allocation reflects an investor's financial goals, investment horizon, and risk tolerance. Because different asset classes react differently to macroeconomic events, proper asset allocation dampens overall portfolio volatility and protects capital during equity market drawdowns through periodic rebalancing back to target weights."
+  },
+  {
+    "id": "RM008",
+    "topic": "Risking a Fixed Percentage Per Trade",
+    "category": "Risk Management",
+    "difficulty": "Intermediate",
+    "keywords": [
+      "fixed percentage risk",
+      "1% rule",
+      "2% rule",
+      "capital preservation",
+      "position sizing formula",
+      "risk limit"
+    ],
+    "content": "Risking a fixed percentage per trade (commonly 1% to 2% of total trading capital) is a cornerstone rule of professional risk management and capital preservation. Under this rule, a trader never allows the maximum potential loss on any single trade to exceed 1% or 2% of account equity if the stop-loss is triggered. This determines the exact position size: Position Size = (Account Capital * Risk %) / (Entry Price - Stop Loss Price). By capping risk per trade, a series of consecutive losses will not cripple the trader's account."
+  },
+  {
+    "id": "RM009",
+    "topic": "Maximum Drawdown",
+    "category": "Risk Management",
+    "difficulty": "Intermediate",
+    "keywords": [
+      "maximum drawdown",
+      "MDD",
+      "peak to trough",
+      "capital recovery",
+      "downside risk",
+      "portfolio health"
+    ],
+    "content": "Maximum Drawdown (MDD) measures the largest observed peak-to-trough percentage decline in portfolio value before a new peak is reached. It is a critical metric for evaluating downside risk and portfolio stress. For example, a 50% drawdown requires a 100% gain just to break even, illustrating the mathematical asymmetry of losses. Monitoring and containing maximum drawdown through disciplined stop-losses and position sizing protects capital from compounding deep losses that are difficult to recover."
   }
 ]
