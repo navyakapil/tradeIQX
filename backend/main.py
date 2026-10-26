@@ -365,7 +365,8 @@ KNOWN_SYMBOLS = {
     "KOTAKBANK", "LT"
 }
 
-@app.post("/buy")
+@app.post("/buy", response_model=schemas.TradeOrderResponse)
+@app.post("/api/trade/buy", response_model=schemas.TradeOrderResponse)
 def buy_stock(
     trade: TradeRequest,
     db: Session = Depends(get_db),
@@ -389,12 +390,6 @@ def buy_stock(
         raise HTTPException(
             status_code=400,
             detail="Price must be greater than zero"
-        )
-
-    if symbol not in KNOWN_SYMBOLS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown stock symbol: {symbol}"
         )
 
     if symbol not in KNOWN_SYMBOLS:
@@ -507,7 +502,8 @@ def buy_stock(
             }
         }
     }
-@app.post("/sell")
+@app.post("/sell", response_model=schemas.TradeOrderResponse)
+@app.post("/api/trade/sell", response_model=schemas.TradeOrderResponse)
 def sell_stock(
     trade: TradeRequest,
     db: Session = Depends(get_db),
@@ -531,6 +527,12 @@ def sell_stock(
         raise HTTPException(
             status_code=400,
             detail="Price must be greater than zero"
+        )
+
+    if symbol not in KNOWN_SYMBOLS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown stock symbol: {symbol}"
         )
 
     eff_user_id, account, portfolio = get_or_create_user_account(db, user_id)

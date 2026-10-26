@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -53,7 +53,7 @@ class UserProfile(BaseModel):
     username: str
     email: EmailStr
     created_at: Optional[datetime] = None
-    cash_balance: float = 100000.0
+    cash_balance: float = 1_000_000.0
 
     class Config:
         from_attributes = True
@@ -63,6 +63,36 @@ class TradeRequest(BaseModel):
     symbol: str = Field(min_length=1, max_length=20)
     quantity: int = Field(gt=0)
     price: float = Field(gt=0)
+    client_order_id: Optional[str] = None
+
+
+class TradeOrderResponse(BaseModel):
+    message: str
+    order_id: Optional[int] = None
+    transaction: Dict[str, Any]
+    portfolio: Dict[str, Any]
+
+
+class HoldingDetail(BaseModel):
+    symbol: str
+    quantity: int
+    avg_price: float
+    invested: float
+    current_price: float
+    current_value: float
+    unrealized_pnl: float
+    return_pct: float
+
+
+class PortfolioSummaryResponse(BaseModel):
+    cash: float
+    holdings: List[HoldingDetail]
+    total_invested: float
+    portfolio_value: float
+    realized_pnl: float
+    unrealized_pnl: float
+    total_pnl: float
+    return_pct: float
 
 
 class MarketQuoteResponse(BaseModel):
