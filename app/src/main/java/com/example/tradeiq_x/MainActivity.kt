@@ -487,13 +487,6 @@ fun HomeScreen(
             onClick = onChatbot
         )
 
-        QuickAccessCard(
-            "✦",
-            "AI Assistant",
-            "Ask questions about stocks and investing",
-            onClick = onAIChatbot
-        )
-
         Spacer(Modifier.height(20.dp))
 
         Text(
