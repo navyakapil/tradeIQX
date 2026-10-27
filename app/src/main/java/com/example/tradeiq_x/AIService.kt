@@ -19,7 +19,7 @@ object AIService {
         get() = if (BuildConfig.BACKEND_BASE_URL.isNotBlank()) {
             BackendApi.baseUrl
         } else {
-            "http://127.0.0.1:8002"
+            "http://10.0.2.2:8000"
         }
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
