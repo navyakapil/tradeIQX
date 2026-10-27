@@ -11,7 +11,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 _DB_DIR = os.path.dirname(os.path.abspath(__file__))
 _DB_PATH = os.path.join(_DB_DIR, "trading.db")
 
-DATABASE_URL = os.getenv("TRADING_DATABASE_URL", f"sqlite:///{_DB_PATH}")
+DATABASE_URL = os.getenv("TRADING_DATABASE_URL") or os.getenv("DATABASE_URL") or f"sqlite:///{_DB_PATH}"
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(
     DATABASE_URL,

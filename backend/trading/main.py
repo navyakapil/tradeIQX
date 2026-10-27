@@ -6,47 +6,54 @@ and persistent order/trade history.
 
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from database import engine, Base, get_db
-from models import Account, Holding, Trade
-from prices import get_stock_info, get_server_price
-from schemas import (
-    QuoteResponse,
-    OrderCreate,
-    OrderResponse,
-    PortfolioSummary,
-    HoldingResponse,
-    TradeResponse,
-)
-from deps import get_current_account
-from services import (
-    execute_buy_order,
-    execute_sell_order,
-    get_existing_idempotent_order,
-)
+
+try:
+    from .database import engine, Base, get_db
+    from .models import Account, Holding, Trade
+    from .prices import get_stock_info, get_server_price
+    from .schemas import (
+        QuoteResponse,
+        OrderCreate,
+        OrderResponse,
+        PortfolioSummary,
+        HoldingResponse,
+        TradeResponse,
+    )
+    from .deps import get_current_account
+    from .services import (
+        execute_buy_order,
+        execute_sell_order,
+        get_existing_idempotent_order,
+    )
+except (ImportError, ValueError):
+    from database import engine, Base, get_db
+    from models import Account, Holding, Trade
+    from prices import get_stock_info, get_server_price
+    from schemas import (
+        QuoteResponse,
+        OrderCreate,
+        OrderResponse,
+        PortfolioSummary,
+        HoldingResponse,
+        TradeResponse,
+    )
+    from deps import get_current_account
+    from services import (
+        execute_buy_order,
+        execute_sell_order,
+        get_existing_idempotent_order,
+    )
 
 # Initialize database schema on startup
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="TradeIQX Trading Engine",
-    description="Paper trading backend service for order execution and persistent portfolios",
-    version="1.0.0",
-)
-
-# Enable CORS for cross-origin and emulator access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+router = APIRouter(tags=["trading"])
 
 
-@app.get("/health")
+@router.get("/health")
 def health_check():
     """Health check endpoint to verify trading engine status."""
     return {
@@ -55,7 +62,7 @@ def health_check():
     }
 
 
-@app.get("/quote/{symbol}", response_model=QuoteResponse)
+@router.get("/quote/{symbol}", response_model=QuoteResponse)
 def get_quote(symbol: str):
     """Returns server-authoritative price quote for a symbol."""
     info = get_stock_info(symbol)
@@ -67,7 +74,7 @@ def get_quote(symbol: str):
     )
 
 
-@app.post("/orders", response_model=OrderResponse)
+@router.post("/orders", response_model=OrderResponse)
 def place_order(
     payload: OrderCreate,
     account: Account = Depends(get_current_account),
@@ -105,7 +112,7 @@ def place_order(
     )
 
 
-@app.get("/portfolio", response_model=PortfolioSummary)
+@router.get("/portfolio", response_model=PortfolioSummary)
 def get_portfolio(
     account: Account = Depends(get_current_account),
     db: Session = Depends(get_db),
@@ -172,7 +179,7 @@ def get_portfolio(
     )
 
 
-@app.get("/transactions", response_model=List[TradeResponse])
+@router.get("/transactions", response_model=List[TradeResponse])
 def get_transactions(
     symbol: Optional[str] = Query(None, description="Filter by stock ticker symbol"),
     side: Optional[str] = Query(None, description="Filter by BUY or SELL"),
@@ -219,3 +226,21 @@ def get_transactions(
 
     trades = query.offset(offset).limit(limit).all()
     return trades
+
+
+app = FastAPI(
+    title="TradeIQX Trading Engine",
+    description="Paper trading backend service for order execution and persistent portfolios",
+    version="1.0.0",
+)
+
+# Enable CORS for cross-origin and emulator access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(router)

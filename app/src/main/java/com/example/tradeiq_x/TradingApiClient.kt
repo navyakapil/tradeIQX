@@ -10,7 +10,12 @@ import java.net.URL
 import java.net.URLEncoder
 
 object TradingApiClient {
-    const val BASE_URL: String = "http://10.0.2.2:8000"
+    val BASE_URL: String
+        get() = if (BuildConfig.BACKEND_BASE_URL.isNotBlank()) {
+            BuildConfig.BACKEND_BASE_URL.trimEnd('/')
+        } else {
+            "http://10.0.2.2:8000"
+        }
     private const val CONNECT_TIMEOUT_MS = 10000
     private const val READ_TIMEOUT_MS = 10000
 

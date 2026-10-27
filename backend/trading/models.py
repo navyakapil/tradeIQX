@@ -15,7 +15,10 @@ from sqlalchemy import (
     Index,
 )
 from sqlalchemy.orm import relationship
-from database import Base
+try:
+    from .database import Base
+except (ImportError, ValueError):
+    from database import Base
 
 DEFAULT_STARTING_CASH: float = 1_000_000.0  # ₹10,00,000
 

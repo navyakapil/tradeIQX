@@ -6,8 +6,13 @@ record is automatically provisioned with the initial virtual starting cash.
 
 from fastapi import Header, Depends, HTTPException
 from sqlalchemy.orm import Session
-from database import get_db
-from models import Account, DEFAULT_STARTING_CASH
+try:
+    from .database import get_db
+    from .models import Account, DEFAULT_STARTING_CASH
+except (ImportError, ValueError):
+    from database import get_db
+    from models import Account, DEFAULT_STARTING_CASH
+
 
 
 def get_current_user_id(

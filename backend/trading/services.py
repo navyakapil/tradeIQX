@@ -9,8 +9,13 @@ from datetime import datetime
 from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from models import Account, Holding, Order, Trade
-from prices import get_server_price
+try:
+    from .models import Account, Holding, Order, Trade
+    from .prices import get_server_price
+except (ImportError, ValueError):
+    from models import Account, Holding, Order, Trade
+    from prices import get_server_price
+
 
 
 def get_existing_idempotent_order(

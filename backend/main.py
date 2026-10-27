@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, List
 import math
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
@@ -97,13 +97,19 @@ def get_db():
     finally:
         db.close()
 
-def get_current_user_id(x_user_id: Optional[int] = Header(None)) -> Optional[int]:
+def get_current_user_id(x_user_id: Optional[str] = Header(None)) -> Optional[str]:
     return x_user_id
 
 
-def resolve_user_portfolio(db: Session, user_id: Optional[int] = None) -> Optional[Portfolio]:
+def resolve_user_portfolio(db: Session, user_id: Optional[Any] = None) -> Optional[Portfolio]:
     if user_id is not None:
-        return db.query(Portfolio).filter(Portfolio.user_id == user_id).first()
+        try:
+            int_id = int(user_id)
+            p = db.query(Portfolio).filter(Portfolio.user_id == int_id).first()
+            if p:
+                return p
+        except (ValueError, TypeError):
+            pass
     return db.query(Portfolio).first()
 
 
@@ -218,8 +224,21 @@ def market_history(symbol: str, range: str = "1D"):
 @app.get("/portfolio")
 def get_portfolio(
     db: Session = Depends(get_db),
-    user_id: Optional[int] = Depends(get_current_user_id),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    if user_id is not None and not str(user_id).isdigit():
+        try:
+            from trading.deps import get_or_create_account
+            from trading.main import get_portfolio as get_trading_portfolio
+            from trading.database import get_db as get_trading_db
+            trading_db = next(get_trading_db())
+            try:
+                account = get_or_create_account(trading_db, str(user_id))
+                return get_trading_portfolio(account=account, db=trading_db)
+            finally:
+                trading_db.close()
+        except Exception as e:
+            logger.warning("Error resolving trading portfolio: %s", e)
 
     portfolio = resolve_user_portfolio(db, user_id)
 
@@ -802,3 +821,15 @@ def analyze_stock(data: StockAnalysisRequest):
         "source": "fallback"
     }
 
+
+
+# ---------------------------------
+# TRADEIQX TRADING ENGINE INTEGRATION
+# ---------------------------------
+try:
+    from trading.main import router as trading_router, Base as TradingBase, engine as trading_engine
+    TradingBase.metadata.create_all(bind=trading_engine)
+    app.include_router(trading_router)
+    logger.info("TradeIQX Trading Engine mounted successfully")
+except Exception as e:
+    logger.warning("Could not mount trading router: %s", e)
